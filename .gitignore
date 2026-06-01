@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 *.rar
+docs/.~lock.*#
 .DS_Store
 data/poli.db
 data/poli.db-shm

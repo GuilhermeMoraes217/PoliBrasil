@@ -13,7 +13,14 @@ Jogo multiplayer de duelos para praticar inglês, com visual retro inspirado em 
 python server.py
 ```
 
-Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um oponente virtual, use `http://localhost:8000/?demo=1`.
+Abra `http://localhost:8000`. Para habilitar localmente partidas demonstrativas contra um oponente virtual:
+
+```powershell
+$env:POLI_ALLOW_DEMO="1"
+python server.py
+```
+
+Depois use `http://localhost:8000/?demo=1`. Em produção, não configure `POLI_ALLOW_DEMO`.
 
 Para testar localmente a mesma entrada WSGI usada em produção:
 

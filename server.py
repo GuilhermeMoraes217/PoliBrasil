@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import random
 import re
 import sqlite3
@@ -26,6 +27,7 @@ FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 ROUND_SECONDS = 10
 LOCK = threading.RLock()
 TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
+ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
@@ -40,6 +42,18 @@ def now_ms() -> int:
 def normalize(value: str) -> str:
     text = unicodedata.normalize("NFD", value.lower())
     return re.sub(r"[^a-z]", "", "".join(char for char in text if unicodedata.category(char) != "Mn"))
+
+
+def progression_from_xp(xp: int) -> dict:
+    xp = max(0, int(xp))
+    absolute_level = min(30, xp // 500 + 1)
+    if absolute_level <= 5:
+        tier, level, max_level = "beginner", absolute_level, 5
+    elif absolute_level <= 15:
+        tier, level, max_level = "intermediate", absolute_level - 5, 10
+    else:
+        tier, level, max_level = "advanced", absolute_level - 15, 15
+    return {"tier": tier, "level": level, "maxLevel": max_level, "xp": xp}
 
 
 def connect_db() -> sqlite3.Connection:
@@ -277,6 +291,23 @@ def finish_room(database: sqlite3.Connection, room: dict, winner: str | None, re
     return room
 
 
+def record_context_ranking(database: sqlite3.Connection, context: dict) -> dict:
+    if context.get("rankingRecorded"):
+        return context
+    if len(context["players"]) < 2:
+        context["rankingRecorded"] = True
+        return context
+    for player in context["players"].values():
+        won = player["uid"] == context.get("winner")
+        update_ranking(database, player, won)
+        database.execute(
+            "INSERT INTO history(uid, room_code, opponent, mode, result, xp, played_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (player["uid"], context["code"], "WORD_RADAR", "word_radar", "win" if won else "loss", player.get("score", 0), now_ms()),
+        )
+    context["rankingRecorded"] = True
+    return context
+
+
 def apply_answer(database: sqlite3.Connection, room: dict, uid: str, answer: str, timed_out: bool = False) -> dict:
     if room["status"] != "playing" or room.get("turn") != uid:
         return room
@@ -331,6 +362,9 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.send_json({"translations": len(VOCABULARY["translations"]), "syllables": len(VOCABULARY["syllables"])})
         if path == "/api/ranking":
             return self.send_json({"ranking": self.get_ranking()})
+        if path == "/api/profile":
+            user = self.require_user()
+            return self.send_json({"profile": self.get_profile(user)}) if user else None
         if path == "/api/history":
             user = self.require_user()
             return self.send_json({"history": self.get_history(user["uid"])}) if user else None
@@ -420,6 +454,8 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 context = apply_context_guess(context, user["uid"], str(payload.get("value", "")))
             except ValueError as error:
                 return self.send_json({"error": str(error)}, status=400)
+            if context["status"] == "finished":
+                context = record_context_ranking(database, context)
             write_context(database, context)
         return self.send_json({"context": public_context(context)})
 
@@ -527,7 +563,16 @@ class PoliHandler(SimpleHTTPRequestHandler):
     def get_ranking(self):
         with closing(connect_db()) as database, database:
             rows = database.execute("SELECT name, photo, xp, wins, losses, games FROM rankings ORDER BY xp DESC, wins DESC LIMIT 10").fetchall()
-        return [dict(row) for row in rows]
+        return [{**dict(row), "progression": progression_from_xp(row["xp"])} for row in rows]
+
+    def get_profile(self, user: dict):
+        with closing(connect_db()) as database, database:
+            row = database.execute("SELECT name, photo, xp, wins, losses, games FROM rankings WHERE uid = ?", (user["uid"],)).fetchone()
+        profile = dict(row) if row else {
+            "name": user.get("name", "GUEST_PLAYER"), "photo": user.get("photo", ""),
+            "xp": 0, "wins": 0, "losses": 0, "games": 0,
+        }
+        return {**profile, "progression": progression_from_xp(profile["xp"])}
 
     def get_history(self, uid: str):
         with closing(connect_db()) as database, database:
@@ -535,7 +580,11 @@ class PoliHandler(SimpleHTTPRequestHandler):
         return [dict(row) for row in rows]
 
     def player_from_user(self, user: dict) -> dict:
-        return {"uid": user["uid"], "name": user.get("name", "GUEST_PLAYER"), "photo": user.get("photo", ""), "hearts": 3, "score": 0}
+        profile = self.get_profile(user)
+        return {
+            "uid": user["uid"], "name": user.get("name", "GUEST_PLAYER"), "photo": user.get("photo", ""),
+            "hearts": 3, "score": 0, "progression": profile["progression"],
+        }
 
     def require_user(self) -> dict | None:
         authorization = self.headers.get("Authorization", "")
@@ -544,9 +593,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return None
         token = authorization[7:]
         if token.startswith("demo-"):
-            return {"uid": token, "name": "DEMO_PLAYER", "photo": ""}
+            if ALLOW_DEMO:
+                return {"uid": token, "name": "DEMO_PLAYER", "photo": ""}
+            self.send_json({"error": "Modo demo desativado"}, status=401)
+            return None
         cached = TOKEN_CACHE.get(token)
-        if cached and cached[0] > time.time():
+        if cached and cached[0] > time.time() and cached[1].get("authProvider") == "google":
             return cached[1]
         request = urllib.request.Request(
             f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={FIREBASE_API_KEY}",
@@ -565,7 +617,14 @@ class PoliHandler(SimpleHTTPRequestHandler):
         except (KeyError, IndexError):
             self.send_json({"error": "Resposta inválida recebida do Firebase"}, status=502)
             return None
-        user = {"uid": firebase_user["localId"], "name": firebase_user.get("displayName", "GUEST_PLAYER").upper().replace(" ", "_"), "photo": firebase_user.get("photoUrl", "")}
+        providers = {provider.get("providerId") for provider in firebase_user.get("providerUserInfo", [])}
+        if "google.com" not in providers:
+            self.send_json({"error": "Faça login com Google para jogar"}, status=401)
+            return None
+        user = {
+            "uid": firebase_user["localId"], "name": firebase_user.get("displayName", "GUEST_PLAYER").upper().replace(" ", "_"),
+            "photo": firebase_user.get("photoUrl", ""), "authProvider": "google",
+        }
         TOKEN_CACHE[token] = (time.time() + 300, user)
         return user
 

@@ -44,7 +44,7 @@ O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio 
 | Área | Entrega |
 | --- | --- |
 | Autenticação | Login e logout com Google via Firebase Authentication |
-| Identidade | Nome, UID e foto do usuário autenticado |
+| Identidade | Nome, UID, foto do usuário autenticado, faixa e nível |
 | Multiplayer | Criação de salas, entrada por código e atualização periódica do estado |
 | Convites | Link copiável e compartilhamento pelo WhatsApp |
 | Translation Rush | Tradução alternada EN → PT-BR e PT-BR → EN |
@@ -58,9 +58,9 @@ O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio 
 
 ## 2.2 Acesso sem login
 
-Usuários não autenticados podem abrir a página inicial e consultar o ranking global. Os modos de jogo, o histórico e as operações de sala exigem autenticação.
+Usuários não autenticados podem abrir a página inicial e consultar o ranking global. Os modos de jogo, o histórico e as operações de sala exigem login com Google.
 
-Essa decisão evita partidas sem identidade verificável e protege o ranking contra gravações arbitrárias. O Firebase Anonymous Authentication está previsto como evolução possível para oferecer a opção **Jogar como convidado**, mas ainda não está exposto pela interface do MVP.
+Essa decisão evita partidas sem identidade verificável e protege o ranking contra gravações arbitrárias. Tokens anônimos do Firebase também são recusados pelo backend. O Firebase Anonymous Authentication permanece como evolução possível para oferecer a opção **Jogar como convidado**, mas ainda não está exposto pela interface do MVP.
 
 ## 2.3 Elementos visuais presentes, mas não persistidos
 
@@ -158,6 +158,7 @@ Encontrar a palavra secreta inglesa. O primeiro jogador que atingir distância `
 - A mesma palavra não pode ser enviada novamente na sala.
 - Jogadores acumulam pontos de acordo com a proximidade.
 - Ao acertar a palavra secreta, o vencedor recebe bônus.
+- Ao encerrar uma sala com pelo menos dois participantes, os pontos são consolidados no ranking e no histórico.
 - Salas ainda não finalizadas permanecem listadas para que o jogador possa retomá-las.
 
 ### Apoio para iniciantes
@@ -197,7 +198,19 @@ Nos duelos tradicionais, cada jogador começa com três corações. Uma resposta
 - Encerramento de duelo tradicional: atualização de ranking e histórico.
 - Vitória em duelo tradicional: bônus adicional no cálculo persistido do ranking.
 
-## 5.3 Ranking e histórico
+## 5.3 Níveis
+
+O XP persistido também define a progressão visual do jogador. Cada nível exige `500 XP`. A moldura da foto recebida pelo login Google muda de cor conforme a faixa.
+
+| Faixa | Níveis | Intervalo inicial de XP | Cor da moldura |
+| --- | ---: | ---: | --- |
+| Iniciante | 1 a 5 | `0` a `2.499 XP` | Verde |
+| Intermediário | 1 a 10 | `2.500` a `7.499 XP` | Roxo |
+| Avançado | 1 a 15 | A partir de `7.500 XP` | Âmbar |
+
+O nível visual máximo é **Avançado 15**. O XP continua acumulando depois desse ponto.
+
+## 5.4 Ranking e histórico
 
 O dashboard contém:
 
@@ -206,7 +219,7 @@ O dashboard contém:
 
 Dados demonstrativos não entram no ranking nem no histórico.
 
-## 5.4 Áudio
+## 5.5 Áudio
 
 O jogo possui efeitos sonoros opcionais gerados no navegador. O estado de áudio é salvo localmente no browser por meio de `localStorage`.
 
@@ -359,7 +372,7 @@ O frontend utiliza Firebase Authentication com provedor Google. Depois do login,
 Authorization: Bearer <firebase-id-token>
 ```
 
-O backend valida o token consultando o Firebase Identity Toolkit e mantém um cache temporário de cinco minutos para reduzir chamadas externas.
+O backend valida o token consultando o Firebase Identity Toolkit, confirma que o provedor é `google.com` e mantém um cache temporário de cinco minutos para reduzir chamadas externas. Tokens anônimos não possuem permissão para jogar.
 
 ## 8.2 Dados públicos do Firebase
 
@@ -409,6 +422,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 
 | Método | Endpoint | Finalidade |
 | --- | --- | --- |
+| `GET` | `/api/profile` | Perfil, XP e nível do usuário autenticado |
 | `POST` | `/api/rooms` | Criar sala |
 | `GET` | `/api/rooms/<code>` | Consultar estado |
 | `POST` | `/api/rooms/<code>/join` | Entrar na sala |

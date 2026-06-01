@@ -37,6 +37,8 @@ button { cursor: pointer; }
 .brand strong { display: block; letter-spacing: 5px; font-family: "Press Start 2P"; font-size: 13px; }
 .brand small { color: var(--muted); display: block; font-size: 9px; letter-spacing: 3px; margin-top: 5px; }
 .topbar-actions { align-items: center; color: var(--muted); display: flex; gap: 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.topbar-profile { align-items: center; display: flex; gap: 7px; }.topbar-profile.hidden { display: none; }
+.compact-avatar { height: 34px; width: 34px; }.level-badge { color: var(--green); font-size: 9px; }
 .user-label { color: var(--green); }
 .online-dot { width: 7px; height: 7px; background: var(--green); box-shadow: 0 0 12px var(--green); border-radius: 50%; }
 main { margin: auto; max-width: 1180px; padding: 64px 22px; }
@@ -92,6 +94,7 @@ h1 span { color: var(--green); }
 .score-list { list-style: none; margin: 20px 0 0; padding: 0; }
 .score-list li { align-items: center; border-top: 1px solid var(--line); display: grid; font-size: 11px; gap: 12px; grid-template-columns: 40px 1fr auto; padding: 11px 0; }
 .score-list b { color: var(--green); }.score-list em { color: var(--purple); font-style: normal; }.score-list .loss b { color: var(--danger); }
+.score-list small { color: var(--muted); display: block; font-size: 8px; margin-top: 4px; }
 .back-button { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-bottom: 28px; }
 .lobby-card { margin: 40px auto; max-width: 710px; padding: 44px; text-align: center; }
 .lobby-card h2 { font-size: 27px; }.lobby-card > p:not(.eyebrow,.small-note) { color: var(--muted); }
@@ -104,6 +107,9 @@ h1 span { color: var(--green); }
 .player-chip.waiting { opacity: .55; }.player-chip.waiting span { color: var(--muted); }
 .avatar { align-items: center; background: #1c4428; border: 1px solid var(--green); color: var(--green); display: flex; font-family: "Press Start 2P"; font-size: 11px; height: 52px; justify-content: center; overflow: hidden; width: 52px; }
 .avatar img { height: 100%; object-fit: cover; width: 100%; }.purple-avatar { background: #342453; border-color: var(--purple); color: var(--purple); }
+.avatar.tier-beginner { border-color: #7ee787; box-shadow: 0 0 12px rgba(126,231,135,.35); }
+.avatar.tier-intermediate { border-color: #c297ff; box-shadow: 0 0 13px rgba(194,151,255,.48); }
+.avatar.tier-advanced { border-color: #f4c95d; box-shadow: 0 0 15px rgba(244,201,93,.58); }
 .versus { color: var(--muted); font-family: "Press Start 2P"; font-size: 11px; }.versus.big { font-size: 16px; }
 .battle-top, .fighters { align-items: center; display: flex; justify-content: space-between; }
 .battle-top { color: var(--muted); font-size: 10px; letter-spacing: 2px; }

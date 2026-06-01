@@ -6,6 +6,7 @@ const state = {
   auth: null,
   firebase: null,
   user: null,
+  profile: null,
   room: null,
   roomCode: null,
   context: null,
@@ -88,10 +89,9 @@ async function connectFirebase() {
     $("#connection-label").textContent = "firebase online";
   } catch (error) {
     console.error(error);
-    state.demo = true;
-    state.user = { uid: `demo-${Date.now()}`, displayName: "Demo Player", photoURL: "" };
-    $("#connection-label").textContent = "demo local";
-    toast("Firebase indisponível: modo demo ativado");
+    state.user = null;
+    $("#connection-label").textContent = "firebase offline";
+    toast("Firebase indisponível. Tente novamente em instantes.");
   }
 }
 
@@ -120,6 +120,7 @@ async function logout() {
     if (state.context) leaveContext();
     await state.firebase.signOut(state.auth);
     state.user = null;
+    state.profile = null;
     renderIdentity();
     renderHistoryMessage("Faça login para registrar partidas.");
     toast("Logout realizado");
@@ -130,15 +131,9 @@ async function logout() {
 }
 
 async function ensureUser() {
-  if (state.user) return state.user;
   if (state.demo) return state.user;
-  try {
-    state.user = (await state.firebase.signInAnonymously(state.auth)).user;
-    return state.user;
-  } catch (error) {
-    toast("Entre com Google para jogar");
-    throw error;
-  }
+  if (isGoogleUser()) return state.user;
+  throw new Error("Faça login com Google para jogar");
 }
 
 async function api(path, options = {}) {
@@ -159,6 +154,11 @@ function renderIdentity() {
   const loggedWithGoogle = state.user?.displayName && !state.demo;
   $("#user-label").textContent = loggedWithGoogle ? shortName(state.user.displayName) : "";
   $("#auth-button").textContent = loggedWithGoogle ? "logout()" : "login_google()";
+  $("#topbar-profile").classList.toggle("hidden", !loggedWithGoogle);
+  if (loggedWithGoogle) {
+    renderAvatar($("#topbar-avatar"), { photo: state.user.photoURL, progression: state.profile?.progression }, "P");
+    $("#topbar-level").textContent = levelLabel(state.profile?.progression);
+  }
 }
 
 function selectMode(mode) {
@@ -449,6 +449,14 @@ function renderFighter(prefix, player, fallback) {
 
 function renderAvatar(element, player, fallback) {
   element.innerHTML = player?.photo ? `<img src="${escapeHtml(player.photo)}" alt="">` : fallback;
+  element.classList.remove("tier-beginner", "tier-intermediate", "tier-advanced");
+  element.classList.add(`tier-${player?.progression?.tier || "beginner"}`);
+  element.title = levelLabel(player?.progression);
+}
+
+function levelLabel(progression) {
+  const labels = { beginner: "INICIANTE", intermediate: "INTERMEDIÁRIO", advanced: "AVANÇADO" };
+  return `${labels[progression?.tier || "beginner"]} ${progression?.level || 1}`;
 }
 
 function startTimer() {
@@ -508,6 +516,8 @@ async function loadDashboard() {
     const ranking = await fetch("/api/ranking").then((response) => response.json());
     renderRanking(ranking.ranking);
     if (isGoogleUser()) {
+      state.profile = (await api("/profile")).profile;
+      renderIdentity();
       renderHistory((await api("/history")).history);
     } else {
       renderHistoryMessage("Faça login para registrar partidas.");
@@ -519,7 +529,7 @@ async function loadDashboard() {
 
 function renderRanking(ranking) {
   $("#ranking-list").innerHTML = ranking.length ? ranking.map((player, index) => `
-    <li><b>#${index + 1}</b><span>${escapeHtml(player.name)}</span><em>${player.xp} XP</em></li>
+    <li><b>#${index + 1}</b><span>${escapeHtml(player.name)} <small>${escapeHtml(levelLabel(player.progression))}</small></span><em>${player.xp} XP</em></li>
   `).join("") : "<li><span>Nenhuma partida registrada ainda.</span></li>";
 }
 

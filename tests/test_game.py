@@ -167,6 +167,40 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(context["status"], "finished")
         self.assertEqual(context["winner"], "one")
 
+    def test_progression_uses_three_tiers_and_caps_advanced_level(self):
+        self.assertEqual(server.progression_from_xp(0)["tier"], "beginner")
+        self.assertEqual(server.progression_from_xp(0)["level"], 1)
+        self.assertEqual(server.progression_from_xp(2499)["level"], 5)
+        self.assertEqual(server.progression_from_xp(2500)["tier"], "intermediate")
+        self.assertEqual(server.progression_from_xp(2500)["level"], 1)
+        self.assertEqual(server.progression_from_xp(7499)["level"], 10)
+        self.assertEqual(server.progression_from_xp(7500)["tier"], "advanced")
+        self.assertEqual(server.progression_from_xp(7500)["level"], 1)
+        self.assertEqual(server.progression_from_xp(999999)["level"], 15)
+
+    def test_context_ranking_is_recorded_only_once(self):
+        context = {
+            "code": "RADAR1", "status": "finished", "winner": "one",
+            "players": {"one": {**self.player_one.copy(), "score": 200}, "two": self.player_two.copy()},
+        }
+        with closing(server.connect_db()) as database, database:
+            server.record_context_ranking(database, context)
+            server.record_context_ranking(database, context)
+            ranking = database.execute("SELECT xp, wins, games FROM rankings WHERE uid = 'one'").fetchone()
+            history_count = database.execute("SELECT COUNT(*) FROM history WHERE uid = 'one'").fetchone()[0]
+        self.assertEqual(dict(ranking), {"xp": 350, "wins": 1, "games": 1})
+        self.assertEqual(history_count, 1)
+
+    def test_context_solo_match_does_not_affect_ranking(self):
+        context = {
+            "code": "RADAR1", "status": "finished", "winner": "one",
+            "players": {"one": {**self.player_one.copy(), "score": 200}},
+        }
+        with closing(server.connect_db()) as database, database:
+            server.record_context_ranking(database, context)
+            ranking_count = database.execute("SELECT COUNT(*) FROM rankings").fetchone()[0]
+        self.assertEqual(ranking_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

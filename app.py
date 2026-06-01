@@ -50,6 +50,13 @@ def ranking():
     return jsonify({"ranking": handler.get_ranking()})
 
 
+@app.get("/api/profile")
+def profile():
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    return jsonify({"profile": handler.get_profile(user)}) if user else handler.response
+
+
 @app.get("/api/history")
 def history():
     handler = FlaskPoliHandler()
