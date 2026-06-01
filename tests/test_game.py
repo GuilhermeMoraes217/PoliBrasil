@@ -99,6 +99,22 @@ class GameEngineTest(unittest.TestCase):
         technology_words = {item["en"] for item in server.VOCABULARY["translations"] if item["category"] == "technology" and item["difficulty"] == "easy"}
         self.assertIn(prompt["id"], technology_words)
 
+    def test_translation_prompt_never_repeats_when_content_is_exhausted(self):
+        candidates = [
+            item["en"] for item in server.VOCABULARY["translations"]
+            if item["category"] == "technology" and item["difficulty"] == "easy"
+        ]
+        prompt = server.choose_prompt("translation", "easy", "technology", candidates)
+        self.assertIsNone(prompt)
+
+    def test_syllable_prompt_never_repeats_when_content_is_exhausted(self):
+        candidates = [
+            item["syllable"] for item in server.VOCABULARY["syllables"]
+            if item["difficulty"] == "hard"
+        ]
+        prompt = server.choose_prompt("syllable", "hard", "all", candidates)
+        self.assertIsNone(prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

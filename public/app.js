@@ -270,7 +270,11 @@ function renderFinished(room) {
   const won = room.winner === state.user.uid;
   $("#finish-result").textContent = won ? "YOU_WIN" : room.winner ? "YOU_LOSE" : "DRAW";
   $("#finish-title").textContent = winner ? `${winner.name} venceu!` : "Partida encerrada";
-  $("#finish-reason").textContent = room.finishReason === "abandoned" ? "Oponente desconectado." : "Fim da batalha. XP registrado no ranking.";
+  $("#finish-reason").textContent = room.finishReason === "abandoned"
+    ? "Oponente desconectado."
+    : room.finishReason === "content_exhausted"
+      ? "Todas as palavras inéditas desta seleção foram usadas."
+      : "Fim da batalha. XP registrado no ranking.";
   $("#finish-scoreboard").innerHTML = Object.values(room.players).map((player) => `
     <div><b>${escapeHtml(player.name)}</b><em>${player.score || 0} XP · ${player.hearts || 0} ♥</em></div>
   `).join("");

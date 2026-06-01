@@ -130,10 +130,11 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .difficulty-choice.selected { border-color: var(--green); color: var(--green); }
 .category-choice { background: #07110d; border: 1px solid var(--line); color: var(--green); font-size: 11px; padding: 12px; width: 100%; }
 .whatsapp { border: 1px solid #4ade80; color: #4ade80; text-decoration: none; }
-.finish-modal { text-align: center; }.finish-modal .button + .button { margin-top: 11px; }
+.finish-modal { max-width: min(560px, calc(100vw - 32px)); overflow-x: hidden; text-align: center; }.finish-modal .button + .button { margin-top: 11px; }
+.finish-modal h2 { overflow-wrap: anywhere; }
 .finish-scoreboard { border: 1px solid var(--line); margin-top: 18px; padding: 5px 14px; text-align: left; }
 .finish-scoreboard div { align-items: center; border-top: 1px solid var(--line); display: grid; font-size: 11px; grid-template-columns: 1fr auto; padding: 11px 0; }
-.finish-scoreboard div:first-child { border-top: 0; }.finish-scoreboard em { color: var(--purple); font-style: normal; }
+.finish-scoreboard div:first-child { border-top: 0; }.finish-scoreboard b { min-width: 0; overflow-wrap: anywhere; }.finish-scoreboard em { color: var(--purple); font-style: normal; white-space: nowrap; }
 .fighter.hit { animation: hit .45s ease; }.fighter.gain { animation: gain .55s ease; }
 .feedback.correct { color: var(--green); }.feedback.wrong, .feedback.timeout { color: var(--danger); }
 .code-input { font-family: "Press Start 2P"; font-size: 25px; letter-spacing: 9px; text-align: center; text-transform: uppercase; }

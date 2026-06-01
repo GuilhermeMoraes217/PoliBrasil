@@ -102,7 +102,9 @@ def choose_prompt(mode: str, difficulty: str, category: str, used_prompts: list[
     if not candidates:
         candidates = VOCABULARY[f"{mode}s"]
     available = [item for item in candidates if (item.get("en") or item.get("syllable")) not in used_prompts]
-    item = random.choice(available or candidates)
+    if not available:
+        return None
+    item = random.choice(available)
     prompt_id = item.get("en") or item["syllable"]
     if mode == "syllable":
         return {
@@ -117,11 +119,20 @@ def choose_prompt(mode: str, difficulty: str, category: str, used_prompts: list[
     return {"word": item["pt"][0], "hint": "TRADUZA PARA INGLÊS", "answers": [item["en"]], "id": prompt_id}
 
 
-def next_round(room: dict) -> dict:
+def next_round(room: dict, database: sqlite3.Connection | None = None) -> dict:
     player_ids = list(room["players"])
     room["round"] = room.get("round", 0) + 1
     room["turn"] = player_ids[(room["round"] - 1) % len(player_ids)]
     room["prompt"] = choose_prompt(room["mode"], room["difficulty"], room.get("category", "all"), room.setdefault("usedPrompts", []), room["round"])
+    if not room["prompt"]:
+        scores = {uid: player.get("score", 0) for uid, player in room["players"].items()}
+        best_score = max(scores.values())
+        leaders = [uid for uid, score in scores.items() if score == best_score]
+        winner = leaders[0] if len(leaders) == 1 else None
+        if database:
+            return finish_room(database, room, winner, "content_exhausted")
+        room.update({"status": "finished", "winner": winner, "finishReason": "content_exhausted", "deadline": now_ms()})
+        return room
     room["usedPrompts"].append(room["prompt"]["id"])
     room["deadline"] = now_ms() + ROUND_SECONDS * 1000
     return room
@@ -196,7 +207,7 @@ def apply_answer(database: sqlite3.Connection, room: dict, uid: str, answer: str
     if player["hearts"] <= 0:
         winner = next(player_uid for player_uid in room["players"] if player_uid != uid)
         return finish_room(database, room, winner, "hearts")
-    return next_round(room)
+    return next_round(room, database)
 
 
 def advance_room(database: sqlite3.Connection, room: dict) -> dict:
@@ -269,7 +280,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             if payload.get("demo"):
                 room["players"]["bot"] = {"uid": "bot", "name": "BYTE_RIVAL", "photo": "", "hearts": 3, "score": 0}
                 room["status"] = "playing"
-                room = next_round(room)
+                room = next_round(room, database)
             write_room(database, room)
         return self.send_json({"room": public_room(room)}, status=201)
 
@@ -293,7 +304,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             room["players"][user["uid"]] = self.player_from_user(user)
             if len(room["players"]) == 2 and room["status"] == "waiting":
                 room["status"] = "playing"
-                room = next_round(room)
+                room = next_round(room, database)
             write_room(database, room)
         return self.send_json({"room": public_room(room)})
 
@@ -334,7 +345,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 room.update({"status": "playing", "round": 0, "usedWords": {}, "usedPrompts": [], "rematch": {}, "winner": None, "finishReason": None, "lastFeedback": None})
                 for player in room["players"].values():
                     player.update({"hearts": 3, "score": 0})
-                room = next_round(room)
+                room = next_round(room, database)
             write_room(database, room)
         return self.send_json({"room": public_room(room)})
 
