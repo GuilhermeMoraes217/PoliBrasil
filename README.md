@@ -14,12 +14,15 @@ Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um o
 
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
+- Modo solo `Word Radar`: descubra uma palavra inglesa por aproximação e aprenda traduções durante as tentativas.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
 - Convites por link, revanche, abandono de partida, ranking e histórico.
 - Validação autoritativa de respostas no backend Python.
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
+
+No `Word Radar`, o backend mantém a palavra secreta oculta até a vitória. O jogador pode digitar uma palavra em português para receber uma sugestão inglesa antes do envio. A proximidade pedagógica considera tema, nível e semelhança lexical dentro da base curada.
 
 ## Ativar Firebase e Google Login
 

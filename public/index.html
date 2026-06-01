@@ -53,7 +53,7 @@
 
         <div class="section-heading">
           <div><p class="eyebrow">// SELECT_GAME_MODE</p><h2>ESCOLHA SEU DESAFIO</h2></div>
-          <span>2 MODOS DISPONÍVEIS</span>
+          <span>3 MODOS DISPONÍVEIS</span>
         </div>
         <div class="mode-grid">
           <article class="mode-card green">
@@ -69,6 +69,13 @@
             <h3>SYLLABLE<br>STRIKE</h3>
             <p>Receba uma sílaba e responda uma palavra em inglês. Errou? Perde um coração.</p>
             <button class="text-button" data-mode="syllable" data-open-modal="create">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+          <article class="mode-card amber">
+            <div class="mode-top"><span>MODE_03</span><i>SOLO</i></div>
+            <div class="pixel-icon">?=<span>EN</span></div>
+            <h3>WORD<br>RADAR</h3>
+            <p>Descubra a palavra secreta em inglês por aproximação. Use português quando precisar aprender uma tradução.</p>
+            <button id="open-context" class="text-button">JOGAR ESTE MODO <b>→</b></button>
           </article>
         </div>
         <div class="dashboard-grid">
@@ -137,6 +144,32 @@
           <p id="feedback" class="feedback">A batalha vai começar...</p>
         </div>
       </section>
+
+      <section id="context-screen" class="screen">
+        <div class="battle-top">
+          <button class="back-button" id="leave-context">← voltar_ao_menu</button>
+          <span>WORD_RADAR · SOLO</span>
+          <span id="context-meta">EASY · ALL</span>
+        </div>
+        <div class="context-layout">
+          <div class="context-main terminal-card">
+            <p class="eyebrow">// FIND_THE_SECRET_WORD</p>
+            <h2>WORD RADAR</h2>
+            <p class="muted">Digite palavras em inglês e observe a proximidade. Se souber apenas em português, eu te ajudo a aprender.</p>
+            <form id="context-form">
+              <input id="context-input" autocomplete="off" placeholder="english_word ou palavra_em_português..." maxlength="32">
+              <button class="button primary" type="submit">TESTAR ↵</button>
+            </form>
+            <div id="context-suggestion" class="context-suggestion hidden"></div>
+            <p id="context-feedback" class="feedback">A palavra secreta está escondida. Comece seu radar.</p>
+          </div>
+          <aside class="context-side dashboard-card">
+            <p class="eyebrow">// ATTEMPTS_LOG</p>
+            <h3><span id="context-count">0</span> TENTATIVAS</h3>
+            <ol id="context-guesses" class="context-guesses"><li class="empty">Nenhuma tentativa ainda.</li></ol>
+          </aside>
+        </div>
+      </section>
     </main>
 
     <dialog id="create-modal" class="modal">
@@ -172,6 +205,27 @@
       <div id="finish-scoreboard" class="finish-scoreboard"></div>
       <button id="rematch-button" class="button primary wide">PEDIR REVANCHE</button>
       <button id="finish-home" class="button secondary wide">VOLTAR AO MENU</button>
+    </dialog>
+
+    <dialog id="context-modal" class="modal">
+      <button class="close-modal" aria-label="Fechar">×</button>
+      <p class="eyebrow">// START_WORD_RADAR</p>
+      <h2>NOVO RADAR</h2>
+      <label>NÍVEL DO VOCABULÁRIO</label>
+      <select id="context-difficulty" class="category-choice">
+        <option value="easy">EASY</option>
+        <option value="medium">MEDIUM</option>
+        <option value="hard">HARD</option>
+      </select>
+      <label>CATEGORIA</label>
+      <select id="context-category" class="category-choice">
+        <option value="all">TODAS</option>
+        <option value="everyday">COTIDIANO</option>
+        <option value="travel">VIAGENS</option>
+        <option value="work">TRABALHO</option>
+        <option value="technology">TECNOLOGIA</option>
+      </select>
+      <button id="start-context" class="button primary wide">INICIAR RADAR</button>
     </dialog>
 
     <dialog id="join-modal" class="modal">

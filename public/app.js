@@ -8,6 +8,7 @@ const state = {
   user: null,
   room: null,
   roomCode: null,
+  context: null,
   pollTimer: null,
   pollInFlight: false,
   timer: null,
@@ -24,7 +25,8 @@ const state = {
 const screens = {
   home: $("#home-screen"),
   lobby: $("#lobby-screen"),
-  game: $("#game-screen")
+  game: $("#game-screen"),
+  context: $("#context-screen")
 };
 
 boot();
@@ -55,6 +57,10 @@ function bindInterface() {
   $("#mute-button").addEventListener("click", toggleMute);
   $("#rematch-button").addEventListener("click", requestRematch);
   $("#finish-home").addEventListener("click", leaveAndGoHome);
+  $("#open-context").addEventListener("click", () => $("#context-modal").showModal());
+  $("#start-context").addEventListener("click", startContext);
+  $("#leave-context").addEventListener("click", leaveContext);
+  $("#context-form").addEventListener("submit", submitContextWord);
   window.addEventListener("beforeunload", notifyLeaveOnUnload);
   renderMute();
 }
@@ -183,6 +189,87 @@ async function joinRoom() {
   } catch (error) {
     toast(error.message);
   }
+}
+
+async function startContext() {
+  try {
+    const { context } = await api("/contexts", {
+      method: "POST",
+      body: { difficulty: $("#context-difficulty").value, category: $("#context-category").value }
+    });
+    $("#context-modal").close();
+    state.context = context;
+    renderContext();
+    showScreen("context");
+    $("#context-input").focus();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function submitContextWord(event) {
+  event.preventDefault();
+  const input = $("#context-input");
+  const value = input.value.trim();
+  if (!value || !state.context) return;
+  try {
+    const { suggestions } = await api(`/contexts/${state.context.code}/suggest`, { method: "POST", body: { value } });
+    if (suggestions.length && !suggestions.some((item) => item.en.toLowerCase() === value.toLowerCase())) {
+      return renderContextSuggestion(suggestions[0]);
+    }
+    await sendContextGuess(value);
+  } catch (error) {
+    $("#context-feedback").textContent = error.message;
+  }
+}
+
+function renderContextSuggestion(suggestion) {
+  const element = $("#context-suggestion");
+  element.classList.remove("hidden");
+  element.innerHTML = `<p>Você quis dizer <b>${escapeHtml(suggestion.en)}</b> em inglês?</p><button class="button primary compact" type="button">ACEITAR E ENVIAR</button>`;
+  element.querySelector("button").addEventListener("click", () => sendContextGuess(suggestion.en));
+}
+
+async function sendContextGuess(value) {
+  try {
+    state.context = (await api(`/contexts/${state.context.code}/guess`, { method: "POST", body: { value } })).context;
+    $("#context-input").value = "";
+    $("#context-suggestion").classList.add("hidden");
+    renderContext();
+    playSound(state.context.status === "solved" ? "gain" : "hit");
+  } catch (error) {
+    $("#context-feedback").textContent = error.message;
+  }
+}
+
+function renderContext() {
+  const context = state.context;
+  $("#context-meta").textContent = `${context.difficulty.toUpperCase()} · ${context.category.toUpperCase()}`;
+  $("#context-count").textContent = context.guesses.length;
+  $("#context-guesses").innerHTML = context.guesses.length ? context.guesses.map((guess) => `
+    <li title="${escapeHtml(guess.translation)}">
+      <b class="context-rank">${guess.proximity}</b>
+      <span class="context-word">${escapeHtml(guess.word)}</span>
+      <button class="context-info" type="button" title="${escapeHtml(guess.translation)}" aria-label="Tradução: ${escapeHtml(guess.translation)}">i</button>
+      <span class="context-meter"><i style="width:${guess.proximity}%"></i></span>
+    </li>
+  `).join("") : '<li class="empty">Nenhuma tentativa ainda.</li>';
+  if (context.status === "solved") {
+    $("#context-feedback").textContent = `Encontrou! ${context.secret.en} = ${context.secret.pt[0]}.`;
+    $("#context-feedback").className = "feedback correct";
+    $("#context-input").disabled = true;
+  } else {
+    $("#context-feedback").textContent = "Quanto maior o número, mais perto você está.";
+    $("#context-feedback").className = "feedback";
+    $("#context-input").disabled = false;
+  }
+}
+
+function leaveContext() {
+  state.context = null;
+  $("#context-input").value = "";
+  $("#context-suggestion").classList.add("hidden");
+  showScreen("home");
 }
 
 function startRoom(room) {

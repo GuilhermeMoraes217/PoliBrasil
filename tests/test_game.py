@@ -115,6 +115,24 @@ class GameEngineTest(unittest.TestCase):
         prompt = server.choose_prompt("syllable", "hard", "all", candidates)
         self.assertIsNone(prompt)
 
+    def test_context_secret_stays_hidden_until_solved(self):
+        secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
+        context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1"}
+        self.assertNotIn("secret", server.public_context(context))
+        context = server.apply_context_guess(context, "apple")
+        self.assertEqual(server.public_context(context)["secret"]["en"], "apple")
+
+    def test_context_suggests_english_word_from_portuguese(self):
+        suggestions = server.find_translation_suggestions("maçã")
+        self.assertTrue(any(item["en"] == "apple" for item in suggestions))
+
+    def test_context_rejects_repeated_guess(self):
+        secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
+        context = {"status": "playing", "secret": secret, "guesses": []}
+        context = server.apply_context_guess(context, "book")
+        with self.assertRaises(ValueError):
+            server.apply_context_guess(context, "book")
+
 
 if __name__ == "__main__":
     unittest.main()

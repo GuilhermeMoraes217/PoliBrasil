@@ -11,6 +11,7 @@ import unicodedata
 import urllib.error
 import urllib.request
 from contextlib import closing
+from difflib import SequenceMatcher
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -74,6 +75,11 @@ def initialize_db() -> None:
                 xp INTEGER NOT NULL,
                 played_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS contexts (
+                code TEXT PRIMARY KEY,
+                payload TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
             """
         )
 
@@ -91,6 +97,71 @@ def write_room(database: sqlite3.Connection, room: dict) -> None:
         """,
         (room["code"], json.dumps(room, ensure_ascii=False), now_ms()),
     )
+
+def read_context(database: sqlite3.Connection, code: str) -> dict | None:
+    row = database.execute("SELECT payload FROM contexts WHERE code = ?", (code,)).fetchone()
+    return json.loads(row["payload"]) if row else None
+
+
+def write_context(database: sqlite3.Connection, context: dict) -> None:
+    database.execute(
+        """
+        INSERT INTO contexts(code, payload, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+        """,
+        (context["code"], json.dumps(context, ensure_ascii=False), now_ms()),
+    )
+
+
+def context_candidates(difficulty: str, category: str) -> list[dict]:
+    candidates = [
+        item for item in VOCABULARY["translations"]
+        if item.get("difficulty", "easy") == difficulty
+        and (category == "all" or item.get("category", "everyday") == category)
+    ]
+    return candidates or VOCABULARY["translations"]
+
+
+def context_similarity(guess: dict, secret: dict) -> int:
+    if guess["en"] == secret["en"]:
+        return 100
+    lexical = SequenceMatcher(None, guess["en"], secret["en"]).ratio()
+    category_bonus = 34 if guess.get("category") == secret.get("category") else 0
+    difficulty_bonus = 12 if guess.get("difficulty") == secret.get("difficulty") else 0
+    return min(99, max(1, round(lexical * 48 + category_bonus + difficulty_bonus)))
+
+
+def public_context(context: dict) -> dict:
+    public = {key: value for key, value in context.items() if key != "secret"}
+    if context["status"] == "solved":
+        public["secret"] = context["secret"]
+    return public
+
+
+def find_translation_suggestions(value: str) -> list[dict]:
+    normalized = normalize(value)
+    if not normalized:
+        return []
+    suggestions = []
+    for item in VOCABULARY["translations"]:
+        if any(normalize(translation) == normalized for translation in item["pt"]):
+            suggestions.append({"en": item["en"], "pt": item["pt"][0]})
+    return suggestions[:5]
+
+
+def apply_context_guess(context: dict, value: str) -> dict:
+    normalized = normalize(value)
+    candidate = next((item for item in VOCABULARY["translations"] if normalize(item["en"]) == normalized), None)
+    if not candidate:
+        raise ValueError("Digite uma palavra em inglês cadastrada ou use uma sugestão em português")
+    if any(item["word"] == candidate["en"] for item in context["guesses"]):
+        raise ValueError("Esta palavra já foi enviada")
+    proximity = context_similarity(candidate, context["secret"])
+    context["guesses"].append({"word": candidate["en"], "translation": candidate["pt"][0], "proximity": proximity})
+    context["guesses"].sort(key=lambda item: item["proximity"], reverse=True)
+    if proximity == 100:
+        context["status"] = "solved"
+    return context
 
 
 def choose_prompt(mode: str, difficulty: str, category: str, used_prompts: list[str], round_number: int = 1) -> dict:
@@ -240,6 +311,9 @@ class PoliHandler(SimpleHTTPRequestHandler):
         if path == "/api/history":
             user = self.require_user()
             return self.send_json({"history": self.get_history(user["uid"])}) if user else None
+        if path.startswith("/api/contexts/"):
+            user = self.require_user()
+            return self.get_context(path.split("/")[-1], user) if user else None
         if path.startswith("/api/rooms/"):
             user = self.require_user()
             return self.get_room(path.split("/")[-1], user) if user else None
@@ -255,11 +329,60 @@ class PoliHandler(SimpleHTTPRequestHandler):
         payload = self.read_json()
         if path == "/api/rooms":
             return self.create_room(user, payload)
+        if path == "/api/contexts":
+            return self.create_context(user, payload)
+        context_match = re.fullmatch(r"/api/contexts/([A-Z0-9]{6})/(suggest|guess)", path)
+        if context_match:
+            code, action = context_match.groups()
+            return getattr(self, f"{action}_context")(code, user, payload)
         match = re.fullmatch(r"/api/rooms/([A-Z0-9]{6})/(join|answer|leave|rematch)", path)
         if not match:
             return self.send_json({"error": "Endpoint not found"}, status=404)
         code, action = match.groups()
         return getattr(self, f"{action}_room")(code, user, payload)
+
+    def create_context(self, user: dict, payload: dict):
+        difficulty = payload.get("difficulty", "easy")
+        category = payload.get("category", "all")
+        if difficulty not in {"easy", "medium", "hard"} or category not in {"all", "everyday", "travel", "work", "technology"}:
+            return self.send_json({"error": "Nível ou categoria inválidos"}, status=400)
+        with LOCK, closing(connect_db()) as database, database:
+            code = random_code()
+            secret = random.choice(context_candidates(difficulty, category))
+            context = {
+                "code": code, "owner": user["uid"], "difficulty": difficulty, "category": category,
+                "status": "playing", "createdAt": now_ms(), "guesses": [], "secret": secret,
+            }
+            write_context(database, context)
+        return self.send_json({"context": public_context(context)}, status=201)
+
+    def get_context(self, code: str, user: dict):
+        with closing(connect_db()) as database, database:
+            context = read_context(database, code)
+        if not context or context["owner"] != user["uid"]:
+            return self.send_json({"error": "Desafio não encontrado"}, status=404)
+        return self.send_json({"context": public_context(context)})
+
+    def suggest_context(self, code: str, user: dict, payload: dict):
+        with closing(connect_db()) as database, database:
+            context = read_context(database, code)
+        if not context or context["owner"] != user["uid"]:
+            return self.send_json({"error": "Desafio não encontrado"}, status=404)
+        return self.send_json({"suggestions": find_translation_suggestions(str(payload.get("value", "")))})
+
+    def guess_context(self, code: str, user: dict, payload: dict):
+        with LOCK, closing(connect_db()) as database, database:
+            context = read_context(database, code)
+            if not context or context["owner"] != user["uid"]:
+                return self.send_json({"error": "Desafio não encontrado"}, status=404)
+            if context["status"] == "solved":
+                return self.send_json({"context": public_context(context)})
+            try:
+                context = apply_context_guess(context, str(payload.get("value", "")))
+            except ValueError as error:
+                return self.send_json({"error": str(error)}, status=400)
+            write_context(database, context)
+        return self.send_json({"context": public_context(context)})
 
     def create_room(self, user: dict, payload: dict):
         mode = payload.get("mode", "translation")
