@@ -58,7 +58,7 @@ function bindInterface() {
   $("#mute-button").addEventListener("click", toggleMute);
   $("#rematch-button").addEventListener("click", requestRematch);
   $("#finish-home").addEventListener("click", leaveAndGoHome);
-  $("#open-context").addEventListener("click", () => $("#context-modal").showModal());
+  $("#open-context").addEventListener("click", openContextModal);
   $("#start-context").addEventListener("click", startContext);
   $("#join-context").addEventListener("click", joinContext);
   $("#leave-context").addEventListener("click", leaveContext);
@@ -207,6 +207,40 @@ async function startContext() {
   }
 }
 
+async function openContextModal() {
+  $("#context-modal").showModal();
+  await loadOpenContexts();
+}
+
+async function loadOpenContexts() {
+  const element = $("#context-open-rooms");
+  try {
+    const { contexts } = await api("/contexts");
+    element.innerHTML = contexts.length ? `
+      <p>// SUAS_SALAS_ABERTAS</p>
+      ${contexts.map((context) => `
+        <button class="context-room" type="button" data-context-code="${context.code}">
+          <b>#${context.code}</b>
+          <span>${context.players} PLAYERS · ${context.guesses} TENTATIVAS</span>
+        </button>
+      `).join("")}
+    ` : "";
+    element.querySelectorAll("[data-context-code]").forEach((button) => button.addEventListener("click", () => resumeContext(button.dataset.contextCode)));
+  } catch (error) {
+    element.innerHTML = "";
+  }
+}
+
+async function resumeContext(code) {
+  try {
+    const { context } = await api(`/contexts/${code}`);
+    $("#context-modal").close();
+    enterContext(context);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 async function joinContext() {
   const code = $("#context-join-code").value.trim().toUpperCase();
   if (code.length !== 6) return toast("Digite um código de 6 caracteres");
@@ -295,10 +329,10 @@ function renderContext() {
     </li>
   `).join("") : '<li class="empty">Nenhuma tentativa ainda.</li>';
   $("#context-feedback").textContent = context.lastSolved
-    ? `${context.lastSolved.player} encontrou ${context.lastSolved.word} = ${context.lastSolved.translation}. Nova palavra liberada!`
+    ? `${context.lastSolved.player} encontrou ${context.lastSolved.word} = ${context.lastSolved.translation} e venceu!`
     : context.learningNote || "Quanto menor o número, mais perto você está. Zero libera uma nova palavra.";
   $("#context-feedback").className = context.lastSolved ? "feedback correct" : "feedback";
-  $("#context-input").disabled = false;
+  $("#context-input").disabled = context.status === "finished";
 }
 
 function leaveContext() {

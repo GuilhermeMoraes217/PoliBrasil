@@ -117,7 +117,7 @@ class GameEngineTest(unittest.TestCase):
 
     def test_context_secret_stays_hidden_until_solved(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
-        context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1", "players": {"one": self.player_one.copy()}, "round": 1, "difficulty": "easy", "category": "everyday", "usedSecrets": ["apple"]}
+        context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1", "players": {"one": self.player_one.copy()}, "round": 1, "difficulty": "easy", "category": "everyday"}
         self.assertNotIn("secret", server.public_context(context))
         context = server.apply_context_guess(context, "one", "apple")
         self.assertEqual(context["guesses"][0]["proximity"], 0)
@@ -155,16 +155,17 @@ class GameEngineTest(unittest.TestCase):
         apple = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
         self.assertLess(server.context_similarity(dress, secret), server.context_similarity(apple, secret))
 
-    def test_context_scores_players_and_rotates_after_solution(self):
+    def test_context_scores_players_and_finishes_after_solution(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
         context = {
             "status": "playing", "secret": secret, "guesses": [], "players": {"one": self.player_one.copy()},
-            "round": 1, "difficulty": "easy", "category": "everyday", "usedSecrets": ["apple"],
+            "round": 1, "difficulty": "easy", "category": "everyday",
         }
         context = server.apply_context_guess(context, "one", "apple")
         self.assertEqual(context["players"]["one"]["score"], 200)
-        self.assertEqual(context["round"], 2)
-        self.assertNotEqual(context["secret"]["en"], "apple")
+        self.assertEqual(context["round"], 1)
+        self.assertEqual(context["status"], "finished")
+        self.assertEqual(context["winner"], "one")
 
 
 if __name__ == "__main__":

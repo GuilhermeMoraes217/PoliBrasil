@@ -157,18 +157,6 @@ def find_translation_suggestions(value: str) -> list[dict]:
     return suggestions[:5]
 
 
-def choose_context_secret(context: dict) -> dict:
-    candidates = context_candidates(context["difficulty"], context["category"])
-    used = context.setdefault("usedSecrets", [])
-    available = [item for item in candidates if item["en"] not in used]
-    if not available:
-        used.clear()
-        available = candidates
-    secret = random.choice(available)
-    used.append(secret["en"])
-    return secret
-
-
 def apply_context_guess(context: dict, uid: str, value: str) -> dict:
     normalized = normalize(value)
     candidate = next((item for item in VOCABULARY["translations"] if normalize(item["en"]) == normalized), None)
@@ -194,8 +182,8 @@ def apply_context_guess(context: dict, uid: str, value: str) -> dict:
     })
     if proximity == 0:
         context["lastSolved"] = {"word": context["secret"]["en"], "translation": context["secret"]["pt"][0], "uid": uid, "player": player["name"]}
-        context["round"] += 1
-        context["secret"] = choose_context_secret(context)
+        context["status"] = "finished"
+        context["winner"] = uid
     return context
 
 
@@ -346,6 +334,9 @@ class PoliHandler(SimpleHTTPRequestHandler):
         if path == "/api/history":
             user = self.require_user()
             return self.send_json({"history": self.get_history(user["uid"])}) if user else None
+        if path == "/api/contexts":
+            user = self.require_user()
+            return self.send_json({"contexts": self.get_open_contexts(user["uid"])}) if user else None
         if path.startswith("/api/contexts/"):
             user = self.require_user()
             return self.get_context(path.split("/")[-1], user) if user else None
@@ -386,16 +377,16 @@ class PoliHandler(SimpleHTTPRequestHandler):
             context = {
                 "code": code, "owner": user["uid"], "difficulty": difficulty, "category": category,
                 "status": "playing", "createdAt": now_ms(), "guesses": [], "round": 1,
-                "players": {user["uid"]: self.player_from_user(user)}, "usedSecrets": [],
+                "players": {user["uid"]: self.player_from_user(user)},
             }
-            context["secret"] = choose_context_secret(context)
+            context["secret"] = random.choice(context_candidates(difficulty, category))
             write_context(database, context)
         return self.send_json({"context": public_context(context)}, status=201)
 
     def get_context(self, code: str, user: dict):
         with closing(connect_db()) as database, database:
             context = read_context(database, code)
-        if not context or user["uid"] not in context["players"]:
+        if not context or user["uid"] not in context.get("players", {}):
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
         return self.send_json({"context": public_context(context)})
 
@@ -405,14 +396,14 @@ class PoliHandler(SimpleHTTPRequestHandler):
             context = read_context(database, code)
             if not context:
                 return self.send_json({"error": "Sala Word Radar não encontrada"}, status=404)
-            context["players"][user["uid"]] = self.player_from_user(user)
+            context.setdefault("players", {})[user["uid"]] = self.player_from_user(user)
             write_context(database, context)
         return self.send_json({"context": public_context(context)})
 
     def suggest_context(self, code: str, user: dict, payload: dict):
         with closing(connect_db()) as database, database:
             context = read_context(database, code)
-        if not context or user["uid"] not in context["players"]:
+        if not context or user["uid"] not in context.get("players", {}):
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
         value = str(payload.get("value", ""))
         known_english = any(normalize(item["en"]) == normalize(value) for item in VOCABULARY["translations"]) or normalize(value) in FREEDICT["english"]
@@ -421,14 +412,29 @@ class PoliHandler(SimpleHTTPRequestHandler):
     def guess_context(self, code: str, user: dict, payload: dict):
         with LOCK, closing(connect_db()) as database, database:
             context = read_context(database, code)
-            if not context or user["uid"] not in context["players"]:
+            if not context or user["uid"] not in context.get("players", {}):
                 return self.send_json({"error": "Desafio não encontrado"}, status=404)
+            if context["status"] == "finished":
+                return self.send_json({"context": public_context(context)})
             try:
                 context = apply_context_guess(context, user["uid"], str(payload.get("value", "")))
             except ValueError as error:
                 return self.send_json({"error": str(error)}, status=400)
             write_context(database, context)
         return self.send_json({"context": public_context(context)})
+
+    def get_open_contexts(self, uid: str):
+        with closing(connect_db()) as database, database:
+            rows = database.execute("SELECT payload FROM contexts ORDER BY updated_at DESC").fetchall()
+        contexts = []
+        for row in rows:
+            context = json.loads(row["payload"])
+            if context.get("status") == "playing" and uid in context.get("players", {}):
+                contexts.append({
+                    "code": context["code"], "difficulty": context["difficulty"], "category": context["category"],
+                    "players": len(context["players"]), "guesses": len(context["guesses"]), "createdAt": context["createdAt"],
+                })
+        return contexts[:10]
 
     def create_room(self, user: dict, payload: dict):
         mode = payload.get("mode", "translation")
