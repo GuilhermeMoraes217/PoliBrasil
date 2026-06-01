@@ -264,7 +264,7 @@ function enterContext(context) {
   state.context = context;
   renderContext();
   showScreen("context");
-  $("#context-input").focus();
+  focusInput("#context-input");
   clearTimeout(state.contextPollTimer);
   state.contextPollTimer = setTimeout(refreshContext, 900);
 }
@@ -313,6 +313,7 @@ async function sendContextGuess(value) {
     $("#context-input").value = "";
     $("#context-suggestion").classList.add("hidden");
     renderContext();
+    focusInput("#context-input");
     playSound(state.context.status === "solved" ? "gain" : "hit");
   } catch (error) {
     $("#context-feedback").textContent = error.message;
@@ -340,6 +341,7 @@ function renderContext() {
     : context.learningNote || "Quanto menor o número, mais perto você está. Zero libera uma nova palavra.";
   $("#context-feedback").className = context.lastSolved ? "feedback correct" : "feedback";
   $("#context-input").disabled = context.status === "finished";
+  focusInput("#context-input");
 }
 
 function leaveContext() {
@@ -392,6 +394,7 @@ function renderRoom() {
   }
   renderBattle();
   showScreen("game");
+  focusInput("#answer-input");
 }
 
 function renderLobby() {
@@ -424,7 +427,7 @@ function renderBattle() {
     state.lastRound = room.round;
     if (!showedFeedback) $("#feedback").textContent = canAnswer ? "Sua vez. Capriche!" : "Aguardando resposta...";
     $("#answer-input").value = "";
-    if (canAnswer) $("#answer-input").focus();
+    if (canAnswer) focusInput("#answer-input");
   }
   startTimer();
 }
@@ -592,6 +595,13 @@ function shortName(name) {
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, screen]) => screen.classList.toggle("active", key === name));
+}
+
+function focusInput(selector) {
+  requestAnimationFrame(() => {
+    const input = $(selector);
+    if (input && !input.disabled) input.focus();
+  });
 }
 
 function renderFeedback(feedback) {
