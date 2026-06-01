@@ -10,6 +10,42 @@ python server.py
 
 Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um oponente virtual, use `http://localhost:8000/?demo=1`.
 
+Para testar localmente a mesma entrada WSGI usada em produção:
+
+```powershell
+pip install -r requirements.txt
+python app.py
+```
+
+## Hospedar no PythonAnywhere
+
+1. Envie o projeto para `/home/SEU_USUARIO/PoliBrasil`.
+2. Em um console Bash, crie o ambiente e instale as dependências:
+
+```bash
+mkvirtualenv --python=/usr/bin/python3.13 poli-env
+pip install -r /home/SEU_USUARIO/PoliBrasil/requirements.txt
+```
+
+3. Em **Web > Add a new web app**, escolha **Manual configuration** e a mesma versão do Python.
+4. Em **Virtualenv**, informe `/home/SEU_USUARIO/.virtualenvs/poli-env`.
+5. No arquivo WSGI exibido na aba **Web**, substitua o conteúdo pelo trecho abaixo, ajustando `SEU_USUARIO`:
+
+```python
+import sys
+
+path = "/home/SEU_USUARIO/PoliBrasil"
+if path not in sys.path:
+    sys.path.insert(0, path)
+
+from app import app as application
+```
+
+6. Clique em **Reload** e abra `https://SEU_USUARIO.pythonanywhere.com`.
+7. No Firebase, adicione `SEU_USUARIO.pythonanywhere.com` em **Authentication > Settings > Authorized domains** para liberar o login Google.
+
+O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em produção. O SQLite continua persistente em `data/poli.db`; faça backup periódico desse arquivo.
+
 ## Recursos
 
 - Login com Google via Firebase Authentication.

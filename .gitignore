@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+*.rar
 .DS_Store
 data/poli.db
 data/poli.db-shm
