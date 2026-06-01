@@ -263,7 +263,7 @@ function renderContext() {
     $("#context-feedback").className = "feedback correct";
     $("#context-input").disabled = true;
   } else {
-    $("#context-feedback").textContent = "Quanto maior o número, mais perto você está.";
+    $("#context-feedback").textContent = context.learningNote || "Quanto maior o número, mais perto você está.";
     $("#context-feedback").className = "feedback";
     $("#context-input").disabled = false;
   }

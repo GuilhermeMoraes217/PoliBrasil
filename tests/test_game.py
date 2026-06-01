@@ -137,6 +137,16 @@ class GameEngineTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             server.apply_context_guess(context, "book")
 
+    def test_context_uses_freedict_portuguese_fallback(self):
+        suggestions = server.find_translation_suggestions("abelha")
+        self.assertTrue(any(item["en"] == "bee" for item in suggestions))
+
+    def test_context_accepts_freedict_english_guess_and_teaches_translation(self):
+        secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
+        context = {"status": "playing", "secret": secret, "guesses": []}
+        context = server.apply_context_guess(context, "bee")
+        self.assertIn("em inglês: bee", context["learningNote"])
+
 
 if __name__ == "__main__":
     unittest.main()

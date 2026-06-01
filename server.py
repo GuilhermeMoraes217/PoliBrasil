@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / "public"
 DATA = ROOT / "data" / "vocabulary.json"
+FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
 FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 ROUND_SECONDS = 10
@@ -28,6 +29,8 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
+with FREEDICT_DATA.open(encoding="utf-8") as freedict_file:
+    FREEDICT = json.load(freedict_file)
 
 
 def now_ms() -> int:
@@ -146,17 +149,24 @@ def find_translation_suggestions(value: str) -> list[dict]:
     for item in VOCABULARY["translations"]:
         if any(normalize(translation) == normalized for translation in item["pt"]):
             suggestions.append({"en": item["en"], "pt": item["pt"][0]})
+    for english in FREEDICT["portuguese"].get(normalized, []):
+        if not any(item["en"] == english for item in suggestions):
+            suggestions.append({"en": english, "pt": value})
     return suggestions[:5]
 
 
 def apply_context_guess(context: dict, value: str) -> dict:
     normalized = normalize(value)
     candidate = next((item for item in VOCABULARY["translations"] if normalize(item["en"]) == normalized), None)
+    if not candidate and normalized in FREEDICT["english"]:
+        freedict_word = FREEDICT["english"][normalized]
+        candidate = {"en": freedict_word["word"], "pt": freedict_word["translations"], "category": "general", "difficulty": "unknown"}
     if not candidate:
         raise ValueError("Digite uma palavra em inglês cadastrada ou use uma sugestão em português")
     if any(item["word"] == candidate["en"] for item in context["guesses"]):
         raise ValueError("Esta palavra já foi enviada")
     proximity = context_similarity(candidate, context["secret"])
+    context["learningNote"] = f"{candidate['pt'][0]} em inglês: {candidate['en']}"
     context["guesses"].append({"word": candidate["en"], "translation": candidate["pt"][0], "proximity": proximity})
     context["guesses"].sort(key=lambda item: item["proximity"], reverse=True)
     if proximity == 100:
@@ -369,7 +379,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
         if not context or context["owner"] != user["uid"]:
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
         value = str(payload.get("value", ""))
-        known_english = any(normalize(item["en"]) == normalize(value) for item in VOCABULARY["translations"])
+        known_english = any(normalize(item["en"]) == normalize(value) for item in VOCABULARY["translations"]) or normalize(value) in FREEDICT["english"]
         return self.send_json({"suggestions": find_translation_suggestions(value), "knownEnglish": known_english})
 
     def guess_context(self, code: str, user: dict, payload: dict):
