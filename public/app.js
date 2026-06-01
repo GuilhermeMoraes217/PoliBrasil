@@ -255,7 +255,7 @@ function renderContext() {
       <b class="context-rank">${guess.proximity}</b>
       <span class="context-word">${escapeHtml(guess.word)}</span>
       <button class="context-info" type="button" title="${escapeHtml(guess.translation)}" aria-label="Tradução: ${escapeHtml(guess.translation)}">i</button>
-      <span class="context-meter"><i style="width:${guess.proximity}%"></i></span>
+      <span class="context-meter"><i style="width:${100 - guess.proximity}%"></i></span>
     </li>
   `).join("") : '<li class="empty">Nenhuma tentativa ainda.</li>';
   if (context.status === "solved") {
@@ -263,7 +263,7 @@ function renderContext() {
     $("#context-feedback").className = "feedback correct";
     $("#context-input").disabled = true;
   } else {
-    $("#context-feedback").textContent = context.learningNote || "Quanto maior o número, mais perto você está.";
+    $("#context-feedback").textContent = context.learningNote || "Quanto menor o número, mais perto você está. Zero é a resposta correta.";
     $("#context-feedback").className = "feedback";
     $("#context-input").disabled = false;
   }

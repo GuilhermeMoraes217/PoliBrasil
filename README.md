@@ -22,7 +22,7 @@ Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um o
 - Validação autoritativa de respostas no backend Python.
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
 
-No `Word Radar`, o backend mantém a palavra secreta oculta até a vitória. O jogador pode digitar uma palavra em português para receber uma sugestão inglesa antes do envio. A proximidade pedagógica considera tema, nível e semelhança lexical dentro da base curada.
+No `Word Radar`, o backend mantém a palavra secreta oculta até a vitória. O jogador pode digitar uma palavra em português para receber uma sugestão inglesa antes do envio. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta; `0` indica acerto.
 
 Para ampliar as sugestões offline português→inglês, o projeto também usa o dicionário livre [FreeDict eng-por](https://download.freedict.org/dictionaries/eng-por/0.3/), sob licença GPL-2.0-or-later. O índice processado possui mais de 15 mil verbetes ingleses e 17 mil traduções portuguesas. Nenhum dicionário finito cobre literalmente todas as palavras e flexões possíveis, mas essa camada oferece um fallback amplo além da curadoria pedagógica.
 

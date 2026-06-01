@@ -127,11 +127,12 @@ def context_candidates(difficulty: str, category: str) -> list[dict]:
 
 def context_similarity(guess: dict, secret: dict) -> int:
     if guess["en"] == secret["en"]:
-        return 100
+        return 0
     lexical = SequenceMatcher(None, guess["en"], secret["en"]).ratio()
     category_bonus = 34 if guess.get("category") == secret.get("category") else 0
     difficulty_bonus = 12 if guess.get("difficulty") == secret.get("difficulty") else 0
-    return min(99, max(1, round(lexical * 48 + category_bonus + difficulty_bonus)))
+    similarity = min(99, max(1, round(lexical * 48 + category_bonus + difficulty_bonus)))
+    return 100 - similarity
 
 
 def public_context(context: dict) -> dict:
@@ -168,8 +169,8 @@ def apply_context_guess(context: dict, value: str) -> dict:
     proximity = context_similarity(candidate, context["secret"])
     context["learningNote"] = f"{candidate['pt'][0]} em inglês: {candidate['en']}"
     context["guesses"].append({"word": candidate["en"], "translation": candidate["pt"][0], "proximity": proximity})
-    context["guesses"].sort(key=lambda item: item["proximity"], reverse=True)
-    if proximity == 100:
+    context["guesses"].sort(key=lambda item: item["proximity"])
+    if proximity == 0:
         context["status"] = "solved"
     return context
 

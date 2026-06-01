@@ -120,6 +120,7 @@ class GameEngineTest(unittest.TestCase):
         context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1"}
         self.assertNotIn("secret", server.public_context(context))
         context = server.apply_context_guess(context, "apple")
+        self.assertEqual(context["guesses"][0]["proximity"], 0)
         self.assertEqual(server.public_context(context)["secret"]["en"], "apple")
 
     def test_context_suggests_english_word_from_portuguese(self):
