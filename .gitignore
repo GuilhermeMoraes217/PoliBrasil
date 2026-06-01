@@ -5,3 +5,4 @@ data/poli.db
 data/poli.db-shm
 data/poli.db-wal
 data/test-*.db*
+data/word_cefr_minified.db

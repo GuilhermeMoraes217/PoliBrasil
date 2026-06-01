@@ -93,28 +93,36 @@ def write_room(database: sqlite3.Connection, room: dict) -> None:
     )
 
 
-def choose_prompt(mode: str, difficulty: str, round_number: int) -> dict:
-    candidates = [item for item in VOCABULARY[f"{mode}s"] if item.get("difficulty", "easy") == difficulty]
+def choose_prompt(mode: str, difficulty: str, category: str, used_prompts: list[str], round_number: int = 1) -> dict:
+    candidates = [
+        item for item in VOCABULARY[f"{mode}s"]
+        if item.get("difficulty", "easy") == difficulty
+        and (category == "all" or item.get("category", "everyday") == category)
+    ]
     if not candidates:
         candidates = VOCABULARY[f"{mode}s"]
-    item = candidates[(round_number * 7) % len(candidates)]
+    available = [item for item in candidates if (item.get("en") or item.get("syllable")) not in used_prompts]
+    item = random.choice(available or candidates)
+    prompt_id = item.get("en") or item["syllable"]
     if mode == "syllable":
         return {
             "word": item["syllable"],
             "hint": "DIGITE UMA PALAVRA EM INGLÊS QUE COMECE COM",
             "answers": item["examples"],
+            "id": prompt_id,
         }
     english_to_portuguese = round_number % 2 == 1
     if english_to_portuguese:
-        return {"word": item["en"], "hint": "TRADUZA PARA PORTUGUÊS", "answers": item["pt"]}
-    return {"word": item["pt"][0], "hint": "TRADUZA PARA INGLÊS", "answers": [item["en"]]}
+        return {"word": item["en"], "hint": "TRADUZA PARA PORTUGUÊS", "answers": item["pt"], "id": prompt_id}
+    return {"word": item["pt"][0], "hint": "TRADUZA PARA INGLÊS", "answers": [item["en"]], "id": prompt_id}
 
 
 def next_round(room: dict) -> dict:
     player_ids = list(room["players"])
     room["round"] = room.get("round", 0) + 1
     room["turn"] = player_ids[(room["round"] - 1) % len(player_ids)]
-    room["prompt"] = choose_prompt(room["mode"], room["difficulty"], room["round"])
+    room["prompt"] = choose_prompt(room["mode"], room["difficulty"], room.get("category", "all"), room.setdefault("usedPrompts", []), room["round"])
+    room["usedPrompts"].append(room["prompt"]["id"])
     room["deadline"] = now_ms() + ROUND_SECONDS * 1000
     return room
 
@@ -176,10 +184,15 @@ def apply_answer(database: sqlite3.Connection, room: dict, uid: str, answer: str
         correct = len(normalized) >= 3 and normalized in valid_words and normalized not in room.get("usedWords", {})
     if correct and not timed_out:
         player["score"] = player.get("score", 0) + 100
+        room["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "correct", "answer": normalized, "xp": 100}
         if room["mode"] == "syllable":
             room.setdefault("usedWords", {})[normalized] = True
     else:
         player["hearts"] -= 1
+        room["lastFeedback"] = {
+            "id": now_ms(), "uid": uid, "kind": "timeout" if timed_out else "wrong",
+            "answer": room["prompt"]["answers"][0], "xp": 0,
+        }
     if player["hearts"] <= 0:
         winner = next(player_uid for player_uid in room["players"] if player_uid != uid)
         return finish_room(database, room, winner, "hearts")
@@ -240,14 +253,15 @@ class PoliHandler(SimpleHTTPRequestHandler):
     def create_room(self, user: dict, payload: dict):
         mode = payload.get("mode", "translation")
         difficulty = payload.get("difficulty", "easy")
-        if mode not in {"translation", "syllable"} or difficulty not in {"easy", "medium", "hard"}:
+        category = payload.get("category", "all")
+        if mode not in {"translation", "syllable"} or difficulty not in {"easy", "medium", "hard"} or category not in {"all", "everyday", "travel", "work", "technology"}:
             return self.send_json({"error": "Modo ou dificuldade inválidos"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             code = random_code()
             while read_room(database, code):
                 code = random_code()
             room = {
-                "code": code, "mode": mode, "difficulty": difficulty, "status": "waiting",
+                "code": code, "mode": mode, "difficulty": difficulty, "category": category, "status": "waiting",
                 "owner": user["uid"], "createdAt": now_ms(), "round": 0,
                 "players": {user["uid"]: self.player_from_user(user)},
                 "demo": bool(payload.get("demo")),
@@ -317,7 +331,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Sala não encontrada"}, status=404)
             room.setdefault("rematch", {})[user["uid"]] = True
             if room["status"] == "finished" and len(room["rematch"]) == len(room["players"]):
-                room.update({"status": "playing", "round": 0, "usedWords": {}, "rematch": {}, "winner": None, "finishReason": None})
+                room.update({"status": "playing", "round": 0, "usedWords": {}, "usedPrompts": [], "rematch": {}, "winner": None, "finishReason": None, "lastFeedback": None})
                 for player in room["players"].values():
                     player.update({"hearts": 3, "score": 0})
                 room = next_round(room)

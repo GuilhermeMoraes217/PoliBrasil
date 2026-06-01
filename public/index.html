@@ -21,6 +21,7 @@
         <span class="online-dot"></span>
         <span id="connection-label">demo local</span>
         <span id="user-label" class="user-label"></span>
+        <button id="mute-button" class="button ghost compact">sound_on()</button>
         <button id="auth-button" class="button ghost compact">login_google()</button>
       </div>
     </header>
@@ -95,6 +96,7 @@
           <div class="invite-box">
             <span id="invite-link">http://localhost:8000/?room=------</span>
             <button id="copy-invite" class="button secondary compact">COPIAR LINK</button>
+            <a id="whatsapp-invite" class="button whatsapp compact" target="_blank" rel="noopener">WHATSAPP</a>
           </div>
           <div class="players-preview">
             <div class="player-chip"><div id="lobby-avatar" class="avatar">P1</div><b id="lobby-name">PLAYER_01</b><span>READY</span></div>
@@ -124,7 +126,7 @@
           </div>
         </div>
         <div class="arena-card">
-          <div class="timer"><i id="timer-bar"></i></div>
+          <div class="timer"><i id="timer-bar"></i><b id="timer-number">10</b></div>
           <p id="turn-label" class="eyebrow">// SUA_VEZ</p>
           <p id="prompt-hint" class="prompt-hint">TRADUZA PARA PORTUGUÊS</p>
           <h2 id="prompt-word">READY?</h2>
@@ -152,6 +154,14 @@
         <button class="difficulty-choice" data-difficulty="medium">MEDIUM</button>
         <button class="difficulty-choice" data-difficulty="hard">HARD</button>
       </div>
+      <label>CATEGORIA</label>
+      <select id="category-choice" class="category-choice">
+        <option value="all">TODAS</option>
+        <option value="everyday">COTIDIANO</option>
+        <option value="travel">VIAGENS</option>
+        <option value="work">TRABALHO</option>
+        <option value="technology">TECNOLOGIA</option>
+      </select>
       <button id="create-room" class="button primary wide">GERAR CÓDIGO DA SALA</button>
     </dialog>
 
@@ -159,6 +169,7 @@
       <p id="finish-result" class="eyebrow">// YOU_WIN</p>
       <h2 id="finish-title">PLAYER venceu!</h2>
       <p id="finish-reason" class="muted">Fim da batalha. XP registrado no ranking.</p>
+      <div id="finish-scoreboard" class="finish-scoreboard"></div>
       <button id="rematch-button" class="button primary wide">PEDIR REVANCHE</button>
       <button id="finish-home" class="button secondary wide">VOLTAR AO MENU</button>
     </dialog>

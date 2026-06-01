@@ -13,7 +13,10 @@ const state = {
   timer: null,
   selectedMode: "translation",
   selectedDifficulty: "easy",
+  selectedCategory: "all",
   lastRound: -1,
+  lastFeedback: null,
+  muted: localStorage.getItem("poli-muted") === "true",
   apiToken: null,
   demo: !config.apiKey || new URLSearchParams(location.search).has("demo")
 };
@@ -49,9 +52,11 @@ function bindInterface() {
   $("#answer-form").addEventListener("submit", submitAnswer);
   $("#room-code").addEventListener("click", copyCode);
   $("#copy-invite").addEventListener("click", copyInvite);
+  $("#mute-button").addEventListener("click", toggleMute);
   $("#rematch-button").addEventListener("click", requestRematch);
   $("#finish-home").addEventListener("click", leaveAndGoHome);
   window.addEventListener("beforeunload", notifyLeaveOnUnload);
+  renderMute();
 }
 
 async function connectFirebase() {
@@ -159,7 +164,8 @@ function selectDifficulty(difficulty) {
 
 async function createRoom() {
   try {
-    const { room } = await api("/rooms", { method: "POST", body: { mode: state.selectedMode, difficulty: state.selectedDifficulty, demo: state.demo } });
+    state.selectedCategory = $("#category-choice").value;
+    const { room } = await api("/rooms", { method: "POST", body: { mode: state.selectedMode, difficulty: state.selectedDifficulty, category: state.selectedCategory, demo: state.demo } });
     $("#create-modal").close();
     startRoom(room);
   } catch (error) {
@@ -183,6 +189,7 @@ function startRoom(room) {
   state.room = room;
   state.roomCode = room.code;
   state.lastRound = -1;
+  state.lastFeedback = null;
   renderRoom();
   scheduleRoomRefresh();
 }
@@ -227,6 +234,7 @@ function renderLobby() {
   $("#lobby-name").textContent = currentPlayer()?.name || "PLAYER_01";
   renderAvatar($("#lobby-avatar"), currentPlayer(), "P1");
   $("#invite-link").textContent = inviteUrl();
+  $("#whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora duelar inglês no Poli English Duel? ${inviteUrl()}`)}`;
 }
 
 function renderBattle() {
@@ -238,17 +246,18 @@ function renderBattle() {
   $("#player-one").classList.toggle("active", room.turn === one.uid);
   $("#player-two").classList.toggle("active", room.turn === two.uid);
   $("#battle-room").textContent = `ROOM #${room.code}`;
-  $("#battle-mode").textContent = `${room.mode === "translation" ? "TRANSLATION_RUSH" : "SYLLABLE_STRIKE"} · ${room.difficulty.toUpperCase()}`;
+  $("#battle-mode").textContent = `${room.mode === "translation" ? "TRANSLATION_RUSH" : "SYLLABLE_STRIKE"} · ${room.difficulty.toUpperCase()} · ${(room.category || "all").toUpperCase()}`;
   const canAnswer = room.turn === state.user.uid && room.status === "playing";
   $("#answer-input").disabled = !canAnswer;
   $("#answer-input").placeholder = canAnswer ? "digite_sua_resposta..." : "aguarde_seu_oponente...";
   $("#turn-label").textContent = room.status === "finished" ? "// GAME_OVER" : canAnswer ? "// SUA_VEZ" : "// VEZ_DO_OPONENTE";
   $("#prompt-hint").textContent = room.prompt?.hint || "BATALHA ENCERRADA";
   $("#prompt-word").textContent = room.prompt?.word || "GG";
+  const showedFeedback = renderFeedback(room.lastFeedback);
   if (room.status === "finished") return renderFinished(room);
   if (state.lastRound !== room.round) {
     state.lastRound = room.round;
-    $("#feedback").textContent = canAnswer ? "Sua vez. Capriche!" : "Aguardando resposta...";
+    if (!showedFeedback) $("#feedback").textContent = canAnswer ? "Sua vez. Capriche!" : "Aguardando resposta...";
     $("#answer-input").value = "";
     if (canAnswer) $("#answer-input").focus();
   }
@@ -262,6 +271,9 @@ function renderFinished(room) {
   $("#finish-result").textContent = won ? "YOU_WIN" : room.winner ? "YOU_LOSE" : "DRAW";
   $("#finish-title").textContent = winner ? `${winner.name} venceu!` : "Partida encerrada";
   $("#finish-reason").textContent = room.finishReason === "abandoned" ? "Oponente desconectado." : "Fim da batalha. XP registrado no ranking.";
+  $("#finish-scoreboard").innerHTML = Object.values(room.players).map((player) => `
+    <div><b>${escapeHtml(player.name)}</b><em>${player.score || 0} XP · ${player.hearts || 0} ♥</em></div>
+  `).join("");
   $("#rematch-button").textContent = room.rematch?.[state.user.uid] ? "AGUARDANDO OPONENTE..." : "PEDIR REVANCHE";
   if (!$("#finish-modal").open) $("#finish-modal").showModal();
 }
@@ -283,6 +295,7 @@ function startTimer() {
     if (!state.room || state.room.status !== "playing") return;
     const remaining = Math.max(0, state.room.deadline - Date.now());
     $("#timer-bar").style.width = `${(remaining / 10000) * 100}%`;
+    $("#timer-number").textContent = Math.ceil(remaining / 1000);
     if (remaining <= 0) refreshRoom();
   };
   tick();
@@ -393,6 +406,56 @@ function shortName(name) {
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, screen]) => screen.classList.toggle("active", key === name));
+}
+
+function renderFeedback(feedback) {
+  if (!feedback || feedback.id === state.lastFeedback) return false;
+  state.lastFeedback = feedback.id;
+  const ownAction = feedback.uid === state.user.uid;
+  const messages = {
+    correct: ownAction ? `Correto! +${feedback.xp} XP` : "Oponente acertou. +100 XP",
+    wrong: ownAction ? `Ops! Resposta: ${feedback.answer}` : `Oponente errou. Resposta: ${feedback.answer}`,
+    timeout: ownAction ? `Tempo esgotado! Resposta: ${feedback.answer}` : `Tempo do oponente esgotado. Resposta: ${feedback.answer}`
+  };
+  const element = $("#feedback");
+  element.textContent = messages[feedback.kind];
+  element.className = `feedback ${feedback.kind}`;
+  const players = Object.values(state.room.players);
+  const index = players.findIndex((player) => player.uid === feedback.uid);
+  const fighter = $(`#player-${index === 0 ? "one" : "two"}`);
+  fighter.classList.remove("hit", "gain");
+  void fighter.offsetWidth;
+  fighter.classList.add(feedback.kind === "correct" ? "gain" : "hit");
+  playSound(feedback.kind === "correct" ? "gain" : "hit");
+  return true;
+}
+
+function toggleMute() {
+  state.muted = !state.muted;
+  localStorage.setItem("poli-muted", state.muted);
+  renderMute();
+  if (!state.muted) playSound("gain");
+}
+
+function renderMute() {
+  $("#mute-button").textContent = state.muted ? "mute()" : "sound_on()";
+}
+
+function playSound(kind) {
+  if (state.muted) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  const context = new AudioContext();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.frequency.value = kind === "gain" ? 660 : 160;
+  oscillator.type = "square";
+  gain.gain.setValueAtTime(.06, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .16);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + .16);
 }
 
 function toast(message) {

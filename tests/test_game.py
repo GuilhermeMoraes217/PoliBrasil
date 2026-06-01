@@ -35,6 +35,13 @@ class GameEngineTest(unittest.TestCase):
         self.assertNotIn("answers", server.public_room(room)["prompt"])
         self.assertIn("answers", room["prompt"])
 
+    def test_wrong_answer_reveals_correct_answer_after_attempt(self):
+        room = self.room()
+        expected = room["prompt"]["answers"][0]
+        with closing(server.connect_db()) as database, database:
+            room = server.apply_answer(database, room, "one", "definitely-wrong")
+        self.assertEqual(server.public_room(room)["lastFeedback"]["answer"], expected)
+
     def test_correct_translation_adds_xp(self):
         room = self.room()
         answer = room["prompt"]["answers"][0]
@@ -80,6 +87,17 @@ class GameEngineTest(unittest.TestCase):
         room = server.next_round(room)
         self.assertEqual(room["round"], 1)
         self.assertEqual(room["players"]["one"]["hearts"], 3)
+
+    def test_prompts_do_not_repeat_while_category_has_unused_words(self):
+        room = self.room()
+        first_prompt = room["prompt"]["id"]
+        room = server.next_round(room)
+        self.assertNotEqual(room["prompt"]["id"], first_prompt)
+
+    def test_category_filters_prompts(self):
+        prompt = server.choose_prompt("translation", "easy", "technology", [])
+        technology_words = {item["en"] for item in server.VOCABULARY["translations"] if item["category"] == "technology" and item["difficulty"] == "easy"}
+        self.assertIn(prompt["id"], technology_words)
 
 
 if __name__ == "__main__":
