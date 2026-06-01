@@ -45,6 +45,7 @@ function bindInterface() {
   $$("[data-open-modal]").forEach((button) => button.addEventListener("click", () => {
     if (!requireGoogleLogin()) return;
     if (button.dataset.mode) selectMode(button.dataset.mode);
+    if (button.dataset.openModal === "create") setModePickerVisibility(!button.dataset.mode);
     $(`#${button.dataset.openModal}-modal`).showModal();
   }));
   $$(".close-modal").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
@@ -165,6 +166,10 @@ function renderIdentity() {
 function selectMode(mode) {
   state.selectedMode = mode;
   $$(".mode-choice").forEach((button) => button.classList.toggle("selected", button.dataset.choice === mode));
+}
+
+function setModePickerVisibility(visible) {
+  $("#mode-picker").classList.toggle("hidden", !visible);
 }
 
 function selectDifficulty(difficulty) {
