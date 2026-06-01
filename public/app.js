@@ -65,9 +65,10 @@ async function connectFirebase() {
     const app = appSdk.initializeApp(config);
     state.firebase = authSdk;
     state.auth = authSdk.getAuth(app);
-    await new Promise((resolve) => authSdk.onAuthStateChanged(state.auth, (user) => {
+    await new Promise((resolve) => authSdk.onAuthStateChanged(state.auth, async (user) => {
       state.user = user;
       renderIdentity();
+      await loadDashboard();
       resolve();
     }));
     $("#connection-label").textContent = "firebase online";
@@ -105,7 +106,7 @@ async function logout() {
     await state.firebase.signOut(state.auth);
     state.user = null;
     renderIdentity();
-    renderHistory([]);
+    renderHistoryMessage("Faça login para registrar partidas.");
     toast("Logout realizado");
   } catch (error) {
     console.error(error);
@@ -318,7 +319,11 @@ async function loadDashboard() {
   try {
     const ranking = await fetch("/api/ranking").then((response) => response.json());
     renderRanking(ranking.ranking);
-    if (state.user) renderHistory((await api("/history")).history);
+    if (isGoogleUser()) {
+      renderHistory((await api("/history")).history);
+    } else {
+      renderHistoryMessage("Faça login para registrar partidas.");
+    }
   } catch (error) {
     console.error(error);
   }
@@ -333,7 +338,15 @@ function renderRanking(ranking) {
 function renderHistory(history) {
   $("#history-list").innerHTML = history.length ? history.map((match) => `
     <li class="${match.result}"><b>${match.result === "win" ? "WIN" : "LOSS"}</b><span>vs ${escapeHtml(match.opponent)}</span><em>${match.xp} XP</em></li>
-  `).join("") : "<li><span>Seu histórico aparecerá aqui.</span></li>";
+  `).join("") : "<li><span>Nenhum duelo registrado ainda.</span></li>";
+}
+
+function renderHistoryMessage(message) {
+  $("#history-list").innerHTML = `<li><span>${escapeHtml(message)}</span></li>`;
+}
+
+function isGoogleUser() {
+  return Boolean(state.user?.displayName && !state.demo);
 }
 
 function openInvite() {

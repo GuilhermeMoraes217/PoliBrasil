@@ -149,6 +149,8 @@ def finish_room(database: sqlite3.Connection, room: dict, winner: str | None, re
     if room["status"] == "finished":
         return room
     room.update({"status": "finished", "winner": winner, "finishReason": reason, "deadline": now_ms()})
+    if room.get("demo"):
+        return room
     players = list(room["players"].values())
     if len(players) == 2:
         for player in players:
@@ -248,6 +250,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 "code": code, "mode": mode, "difficulty": difficulty, "status": "waiting",
                 "owner": user["uid"], "createdAt": now_ms(), "round": 0,
                 "players": {user["uid"]: self.player_from_user(user)},
+                "demo": bool(payload.get("demo")),
             }
             if payload.get("demo"):
                 room["players"]["bot"] = {"uid": "bot", "name": "BYTE_RIVAL", "photo": "", "hearts": 3, "score": 0}

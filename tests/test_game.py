@@ -61,6 +61,16 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(ranking["wins"], 1)
         self.assertEqual(history["result"], "loss")
 
+    def test_demo_match_does_not_affect_ranking(self):
+        room = self.room()
+        room["demo"] = True
+        with closing(server.connect_db()) as database, database:
+            server.finish_room(database, room, "two", "hearts")
+            ranking_count = database.execute("SELECT COUNT(*) FROM rankings").fetchone()[0]
+            history_count = database.execute("SELECT COUNT(*) FROM history").fetchone()[0]
+        self.assertEqual(ranking_count, 0)
+        self.assertEqual(history_count, 0)
+
     def test_next_round_restores_match_state_for_rematch(self):
         room = self.room()
         room["players"]["one"]["hearts"] = 0
