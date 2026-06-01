@@ -22,6 +22,18 @@ window|janela|everyday|easy
 breakfast|café da manhã|everyday|easy
 chair|cadeira|everyday|easy
 clothes|roupas|everyday|easy
+shirt|camisa|everyday|easy
+shoe|sapato|everyday|easy
+pants|calça|calças|everyday|easy
+coat|casaco|everyday|easy
+dress|vestido|everyday|easy
+door|porta|everyday|easy
+table|mesa|everyday|easy
+bed|cama|everyday|easy
+bathroom|banheiro|everyday|easy
+water|água|everyday|easy
+food|comida|everyday|easy
+phone|telefone|celular|everyday|easy
 dinner|jantar|everyday|easy
 garden|jardim|everyday|easy
 kitchen|cozinha|everyday|easy

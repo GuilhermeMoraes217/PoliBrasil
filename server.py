@@ -368,7 +368,9 @@ class PoliHandler(SimpleHTTPRequestHandler):
             context = read_context(database, code)
         if not context or context["owner"] != user["uid"]:
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
-        return self.send_json({"suggestions": find_translation_suggestions(str(payload.get("value", "")))})
+        value = str(payload.get("value", ""))
+        known_english = any(normalize(item["en"]) == normalize(value) for item in VOCABULARY["translations"])
+        return self.send_json({"suggestions": find_translation_suggestions(value), "knownEnglish": known_english})
 
     def guess_context(self, code: str, user: dict, payload: dict):
         with LOCK, closing(connect_db()) as database, database:

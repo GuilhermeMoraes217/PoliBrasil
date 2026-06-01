@@ -213,9 +213,13 @@ async function submitContextWord(event) {
   const value = input.value.trim();
   if (!value || !state.context) return;
   try {
-    const { suggestions } = await api(`/contexts/${state.context.code}/suggest`, { method: "POST", body: { value } });
+    const { suggestions, knownEnglish } = await api(`/contexts/${state.context.code}/suggest`, { method: "POST", body: { value } });
     if (suggestions.length && !suggestions.some((item) => item.en.toLowerCase() === value.toLowerCase())) {
       return renderContextSuggestion(suggestions[0]);
+    }
+    if (!knownEnglish) {
+      $("#context-feedback").textContent = "Ainda não encontrei essa palavra. Tente outro termo em português ou uma palavra em inglês cadastrada.";
+      return;
     }
     await sendContextGuess(value);
   } catch (error) {

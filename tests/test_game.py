@@ -126,6 +126,10 @@ class GameEngineTest(unittest.TestCase):
         suggestions = server.find_translation_suggestions("maçã")
         self.assertTrue(any(item["en"] == "apple" for item in suggestions))
 
+    def test_context_suggests_ascii_portuguese_word(self):
+        suggestions = server.find_translation_suggestions("camisa")
+        self.assertTrue(any(item["en"] == "shirt" for item in suggestions))
+
     def test_context_rejects_repeated_guess(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
         context = {"status": "playing", "secret": secret, "guesses": []}

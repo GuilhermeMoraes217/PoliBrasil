@@ -113,6 +113,104 @@
       "difficulty": "easy"
     },
     {
+      "en": "shirt",
+      "pt": [
+        "camisa"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "shoe",
+      "pt": [
+        "sapato"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "pants",
+      "pt": [
+        "calça",
+        "calças"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "coat",
+      "pt": [
+        "casaco"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "dress",
+      "pt": [
+        "vestido"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "door",
+      "pt": [
+        "porta"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "table",
+      "pt": [
+        "mesa"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "bed",
+      "pt": [
+        "cama"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "bathroom",
+      "pt": [
+        "banheiro"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "water",
+      "pt": [
+        "água"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "food",
+      "pt": [
+        "comida"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
+      "en": "phone",
+      "pt": [
+        "telefone",
+        "celular"
+      ],
+      "category": "everyday",
+      "difficulty": "easy"
+    },
+    {
       "en": "dinner",
       "pt": [
         "jantar"
@@ -1417,6 +1515,7 @@
     {
       "syllable": "ba",
       "examples": [
+        "bathroom",
         "backup",
         "bandwidth",
         "back",
@@ -1458,12 +1557,13 @@
         "bags",
         "basal"
       ],
-      "category": "technology",
-      "difficulty": "medium"
+      "category": "everyday",
+      "difficulty": "easy"
     },
     {
       "syllable": "be",
       "examples": [
+        "bed",
         "beach",
         "been",
         "between",
@@ -1482,7 +1582,6 @@
         "benefits",
         "behavior",
         "becomes",
-        "bed",
         "benefit",
         "beginning",
         "begin",
@@ -1529,7 +1628,7 @@
         "bent",
         "beans"
       ],
-      "category": "travel",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -1973,6 +2072,7 @@
       "syllable": "co",
       "examples": [
         "coffee",
+        "coat",
         "commitment",
         "company",
         "computer",
@@ -2050,8 +2150,7 @@
         "competition",
         "connected",
         "conflict",
-        "contain",
-        "composition"
+        "contain"
       ],
       "category": "everyday",
       "difficulty": "easy"
@@ -2350,12 +2449,12 @@
     {
       "syllable": "do",
       "examples": [
+        "door",
         "download",
         "does",
         "done",
         "down",
         "doing",
-        "door",
         "dollars",
         "domestic",
         "doubt",
@@ -2380,12 +2479,13 @@
         "doses",
         "dominated"
       ],
-      "category": "technology",
-      "difficulty": "medium"
+      "category": "everyday",
+      "difficulty": "easy"
     },
     {
       "syllable": "dr",
       "examples": [
+        "dress",
         "drug",
         "dry",
         "drawn",
@@ -2403,7 +2503,6 @@
         "drew",
         "dramatic",
         "drop",
-        "dress",
         "drama",
         "drinking",
         "drawings",
@@ -2415,7 +2514,7 @@
         "drivers",
         "drilling"
       ],
-      "category": "general",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -3055,12 +3154,12 @@
     {
       "syllable": "fo",
       "examples": [
+        "food",
         "for",
         "found",
         "form",
         "four",
         "following",
-        "food",
         "force",
         "foreign",
         "follows",
@@ -3106,7 +3205,7 @@
         "football",
         "foster"
       ],
-      "category": "general",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -4919,6 +5018,7 @@
     {
       "syllable": "pa",
       "examples": [
+        "pants",
         "passport",
         "password",
         "part",
@@ -4997,10 +5097,9 @@
         "pays",
         "passages",
         "patrick",
-        "paintings",
-        "paragraphs"
+        "paintings"
       ],
-      "category": "travel",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -5061,9 +5160,9 @@
     {
       "syllable": "ph",
       "examples": [
+        "phone",
         "physical",
         "phase",
-        "phone",
         "philosophy",
         "philadelphia",
         "physics",
@@ -5086,7 +5185,7 @@
         "phillips",
         "physiology"
       ],
-      "category": "general",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -5788,6 +5887,8 @@
     {
       "syllable": "sh",
       "examples": [
+        "shirt",
+        "shoe",
         "she",
         "should",
         "shall",
@@ -5829,7 +5930,6 @@
         "shaped",
         "shareholders",
         "sharply",
-        "shirt",
         "shelter",
         "sheriff",
         "shear",
@@ -5846,7 +5946,7 @@
         "shed",
         "shopping"
       ],
-      "category": "general",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
@@ -6275,10 +6375,10 @@
     {
       "syllable": "ta",
       "examples": [
+        "table",
         "task",
         "take",
         "taken",
-        "table",
         "tax",
         "taking",
         "takes",
@@ -6308,8 +6408,8 @@
         "taiwan",
         "talent"
       ],
-      "category": "work",
-      "difficulty": "medium"
+      "category": "everyday",
+      "difficulty": "easy"
     },
     {
       "syllable": "te",
@@ -6885,9 +6985,9 @@
     {
       "syllable": "wa",
       "examples": [
+        "water",
         "was",
         "way",
-        "water",
         "war",
         "want",
         "washington",
@@ -6927,7 +7027,7 @@
         "wayne",
         "wallace"
       ],
-      "category": "general",
+      "category": "everyday",
       "difficulty": "easy"
     },
     {
