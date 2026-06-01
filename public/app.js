@@ -43,6 +43,7 @@ async function boot() {
 
 function bindInterface() {
   $$("[data-open-modal]").forEach((button) => button.addEventListener("click", () => {
+    if (!requireGoogleLogin()) return;
     if (button.dataset.mode) selectMode(button.dataset.mode);
     $(`#${button.dataset.openModal}-modal`).showModal();
   }));
@@ -208,6 +209,7 @@ async function startContext() {
 }
 
 async function openContextModal() {
+  if (!requireGoogleLogin()) return;
   $("#context-modal").showModal();
   await loadOpenContexts();
 }
@@ -547,9 +549,16 @@ function isGoogleUser() {
   return Boolean(state.user?.displayName && !state.demo);
 }
 
+function requireGoogleLogin() {
+  if (state.demo || isGoogleUser()) return true;
+  toast("Faça login com Google para jogar");
+  return false;
+}
+
 function openInvite() {
   const code = new URLSearchParams(location.search).get("room");
   if (!code) return;
+  if (!requireGoogleLogin()) return;
   $("#join-code").value = code.toUpperCase();
   $("#join-modal").showModal();
 }
