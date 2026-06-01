@@ -129,9 +129,12 @@ def context_similarity(guess: dict, secret: dict) -> int:
     if guess["en"] == secret["en"]:
         return 0
     lexical = SequenceMatcher(None, guess["en"], secret["en"]).ratio()
-    category_bonus = 34 if guess.get("category") == secret.get("category") else 0
-    difficulty_bonus = 12 if guess.get("difficulty") == secret.get("difficulty") else 0
-    similarity = min(99, max(1, round(lexical * 48 + category_bonus + difficulty_bonus)))
+    same_concept = guess.get("concept") and guess.get("concept") == secret.get("concept")
+    same_category = guess.get("category") == secret.get("category")
+    concept_bonus = 58 if same_concept else 0
+    category_bonus = 16 if same_category else 0
+    difficulty_bonus = 5 if guess.get("difficulty") == secret.get("difficulty") else 0
+    similarity = min(99, max(1, round(lexical * 20 + concept_bonus + category_bonus + difficulty_bonus)))
     return 100 - similarity
 
 

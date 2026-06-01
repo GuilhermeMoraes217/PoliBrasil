@@ -148,6 +148,12 @@ class GameEngineTest(unittest.TestCase):
         context = server.apply_context_guess(context, "bee")
         self.assertIn("em inglês: bee", context["learningNote"])
 
+    def test_context_semantic_concept_ranks_related_word_closer(self):
+        secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "shirt")
+        dress = next(item for item in server.VOCABULARY["translations"] if item["en"] == "dress")
+        apple = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
+        self.assertLess(server.context_similarity(dress, secret), server.context_similarity(apple, secret))
+
 
 if __name__ == "__main__":
     unittest.main()

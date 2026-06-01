@@ -13,7 +13,8 @@
         "maçã"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "book",
@@ -21,7 +22,8 @@
         "livro"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "coffee",
@@ -29,7 +31,8 @@
         "café"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "family",
@@ -37,7 +40,8 @@
         "família"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "people"
     },
     {
       "en": "friend",
@@ -46,7 +50,8 @@
         "amiga"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "people"
     },
     {
       "en": "house",
@@ -54,7 +59,8 @@
         "casa"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "music",
@@ -62,7 +68,8 @@
         "música"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "school",
@@ -70,7 +77,8 @@
         "escola"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "street",
@@ -78,7 +86,8 @@
         "rua"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "window",
@@ -86,7 +95,8 @@
         "janela"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "breakfast",
@@ -94,7 +104,8 @@
         "café da manhã"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "chair",
@@ -102,7 +113,8 @@
         "cadeira"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "everyday"
     },
     {
       "en": "clothes",
@@ -110,7 +122,8 @@
         "roupas"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "shirt",
@@ -118,7 +131,8 @@
         "camisa"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "shoe",
@@ -126,7 +140,8 @@
         "sapato"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "pants",
@@ -135,7 +150,8 @@
         "calças"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "coat",
@@ -143,7 +159,8 @@
         "casaco"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "dress",
@@ -151,7 +168,8 @@
         "vestido"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "clothing"
     },
     {
       "en": "door",
@@ -159,7 +177,8 @@
         "porta"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "table",
@@ -167,7 +186,8 @@
         "mesa"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "bed",
@@ -175,7 +195,8 @@
         "cama"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "bathroom",
@@ -183,7 +204,8 @@
         "banheiro"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "water",
@@ -191,7 +213,8 @@
         "água"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "food",
@@ -199,7 +222,8 @@
         "comida"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "phone",
@@ -208,7 +232,8 @@
         "celular"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "device"
     },
     {
       "en": "dinner",
@@ -216,7 +241,8 @@
         "jantar"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "food"
     },
     {
       "en": "garden",
@@ -224,7 +250,8 @@
         "jardim"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "kitchen",
@@ -232,7 +259,8 @@
         "cozinha"
       ],
       "category": "everyday",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "home"
     },
     {
       "en": "neighbor",
@@ -241,7 +269,8 @@
         "vizinha"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "people"
     },
     {
       "en": "advice",
@@ -249,7 +278,8 @@
         "conselho"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "appointment",
@@ -258,7 +288,8 @@
         "consulta"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "choice",
@@ -266,7 +297,8 @@
         "escolha"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "habit",
@@ -275,7 +307,8 @@
         "costume"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "knowledge",
@@ -283,7 +316,8 @@
         "conhecimento"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "lifestyle",
@@ -291,7 +325,8 @@
         "estilo de vida"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "neighborhood",
@@ -299,7 +334,8 @@
         "vizinhança"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "purpose",
@@ -308,7 +344,8 @@
         "objetivo"
       ],
       "category": "everyday",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "everyday"
     },
     {
       "en": "awareness",
@@ -316,7 +353,8 @@
         "consciência"
       ],
       "category": "everyday",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "everyday"
     },
     {
       "en": "commitment",
@@ -324,7 +362,8 @@
         "compromisso"
       ],
       "category": "everyday",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "everyday"
     },
     {
       "en": "household",
@@ -333,7 +372,8 @@
         "lar"
       ],
       "category": "everyday",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "everyday"
     },
     {
       "en": "willingness",
@@ -341,7 +381,8 @@
         "disposição"
       ],
       "category": "everyday",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "everyday"
     },
     {
       "en": "acquaintance",
@@ -350,7 +391,8 @@
         "conhecida"
       ],
       "category": "everyday",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "people"
     },
     {
       "en": "airport",
@@ -358,7 +400,8 @@
         "aeroporto"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "transport"
     },
     {
       "en": "beach",
@@ -366,7 +409,8 @@
         "praia"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel_place"
     },
     {
       "en": "bridge",
@@ -374,7 +418,8 @@
         "ponte"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel"
     },
     {
       "en": "bus",
@@ -382,7 +427,8 @@
         "ônibus"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "transport"
     },
     {
       "en": "city",
@@ -390,7 +436,8 @@
         "cidade"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel_place"
     },
     {
       "en": "hotel",
@@ -398,7 +445,8 @@
         "hotel"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel_place"
     },
     {
       "en": "journey",
@@ -407,7 +455,8 @@
         "viagem"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel"
     },
     {
       "en": "map",
@@ -415,7 +464,8 @@
         "mapa"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel"
     },
     {
       "en": "passport",
@@ -423,7 +473,8 @@
         "passaporte"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "transport"
     },
     {
       "en": "ticket",
@@ -432,7 +483,8 @@
         "bilhete"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "transport"
     },
     {
       "en": "train",
@@ -440,7 +492,8 @@
         "trem"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "transport"
     },
     {
       "en": "trip",
@@ -448,7 +501,8 @@
         "viagem"
       ],
       "category": "travel",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "travel"
     },
     {
       "en": "luggage",
@@ -456,7 +510,8 @@
         "bagagem"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "boarding",
@@ -464,7 +519,8 @@
         "embarque"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "destination",
@@ -472,7 +528,8 @@
         "destino"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "departure",
@@ -481,7 +538,8 @@
         "saída"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "itinerary",
@@ -490,7 +548,8 @@
         "itinerário"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "landmark",
@@ -498,7 +557,8 @@
         "ponto turístico"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel_place"
     },
     {
       "en": "route",
@@ -507,7 +567,8 @@
         "caminho"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "sightseeing",
@@ -516,7 +577,8 @@
         "passeio turístico"
       ],
       "category": "travel",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "travel"
     },
     {
       "en": "accommodation",
@@ -525,7 +587,8 @@
         "acomodação"
       ],
       "category": "travel",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "travel"
     },
     {
       "en": "customs",
@@ -533,7 +596,8 @@
         "alfândega"
       ],
       "category": "travel",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "travel"
     },
     {
       "en": "layover",
@@ -542,7 +606,8 @@
         "conexão"
       ],
       "category": "travel",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "travel"
     },
     {
       "en": "overseas",
@@ -551,7 +616,8 @@
         "além-mar"
       ],
       "category": "travel",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "travel"
     },
     {
       "en": "work",
@@ -559,7 +625,8 @@
         "trabalho"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "career"
     },
     {
       "en": "job",
@@ -568,7 +635,8 @@
         "trabalho"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "career"
     },
     {
       "en": "boss",
@@ -576,7 +644,8 @@
         "chefe"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "office_people"
     },
     {
       "en": "office",
@@ -584,7 +653,8 @@
         "escritório"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "office"
     },
     {
       "en": "team",
@@ -593,7 +663,8 @@
         "time"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "office_people"
     },
     {
       "en": "meeting",
@@ -601,7 +672,8 @@
         "reunião"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "office"
     },
     {
       "en": "email",
@@ -609,7 +681,8 @@
         "e-mail"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "office"
     },
     {
       "en": "company",
@@ -617,7 +690,8 @@
         "empresa"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "work"
     },
     {
       "en": "career",
@@ -625,7 +699,8 @@
         "carreira"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "career"
     },
     {
       "en": "salary",
@@ -633,7 +708,8 @@
         "salário"
       ],
       "category": "work",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "career"
     },
     {
       "en": "deadline",
@@ -642,7 +718,8 @@
         "data limite"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "office"
     },
     {
       "en": "feedback",
@@ -651,7 +728,8 @@
         "avaliação"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "work"
     },
     {
       "en": "goal",
@@ -660,7 +738,8 @@
         "objetivo"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "work"
     },
     {
       "en": "interview",
@@ -668,7 +747,8 @@
         "entrevista"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "work"
     },
     {
       "en": "leadership",
@@ -676,7 +756,8 @@
         "liderança"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "office_people"
     },
     {
       "en": "manager",
@@ -685,7 +766,8 @@
         "gestor"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "office_people"
     },
     {
       "en": "schedule",
@@ -694,7 +776,8 @@
         "cronograma"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "office"
     },
     {
       "en": "task",
@@ -702,7 +785,8 @@
         "tarefa"
       ],
       "category": "work",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "office"
     },
     {
       "en": "achievement",
@@ -711,7 +795,8 @@
         "realização"
       ],
       "category": "work",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "work"
     },
     {
       "en": "stakeholder",
@@ -719,7 +804,8 @@
         "parte interessada"
       ],
       "category": "work",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "work"
     },
     {
       "en": "workload",
@@ -727,7 +813,8 @@
         "carga de trabalho"
       ],
       "category": "work",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "work"
     },
     {
       "en": "promotion",
@@ -735,7 +822,8 @@
         "promoção"
       ],
       "category": "work",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "career"
     },
     {
       "en": "computer",
@@ -743,7 +831,8 @@
         "computador"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "device"
     },
     {
       "en": "cloud",
@@ -751,7 +840,8 @@
         "nuvem"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "software"
     },
     {
       "en": "file",
@@ -759,7 +849,8 @@
         "arquivo"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "software"
     },
     {
       "en": "keyboard",
@@ -767,7 +858,8 @@
         "teclado"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "device"
     },
     {
       "en": "mouse",
@@ -775,7 +867,8 @@
         "mouse"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "device"
     },
     {
       "en": "screen",
@@ -783,7 +876,8 @@
         "tela"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "device"
     },
     {
       "en": "website",
@@ -791,7 +885,8 @@
         "site"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "software"
     },
     {
       "en": "password",
@@ -799,7 +894,8 @@
         "senha"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "security"
     },
     {
       "en": "network",
@@ -807,7 +903,8 @@
         "rede"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "network"
     },
     {
       "en": "app",
@@ -816,7 +913,8 @@
         "app"
       ],
       "category": "technology",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "concept": "software"
     },
     {
       "en": "backup",
@@ -825,7 +923,8 @@
         "backup"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "technology"
     },
     {
       "en": "browser",
@@ -833,7 +932,8 @@
         "navegador"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "software"
     },
     {
       "en": "database",
@@ -841,7 +941,8 @@
         "banco de dados"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "software"
     },
     {
       "en": "device",
@@ -850,7 +951,8 @@
         "aparelho"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "device"
     },
     {
       "en": "download",
@@ -859,7 +961,8 @@
         "download"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "technology"
     },
     {
       "en": "software",
@@ -868,7 +971,8 @@
         "software"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "technology"
     },
     {
       "en": "storage",
@@ -876,7 +980,8 @@
         "armazenamento"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "technology"
     },
     {
       "en": "update",
@@ -885,7 +990,8 @@
         "atualizar"
       ],
       "category": "technology",
-      "difficulty": "medium"
+      "difficulty": "medium",
+      "concept": "technology"
     },
     {
       "en": "algorithm",
@@ -893,7 +999,8 @@
         "algoritmo"
       ],
       "category": "technology",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "technology"
     },
     {
       "en": "bandwidth",
@@ -901,7 +1008,8 @@
         "largura de banda"
       ],
       "category": "technology",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "network"
     },
     {
       "en": "encryption",
@@ -909,7 +1017,8 @@
         "criptografia"
       ],
       "category": "technology",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "security"
     },
     {
       "en": "framework",
@@ -918,7 +1027,8 @@
         "framework"
       ],
       "category": "technology",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "technology"
     },
     {
       "en": "throughput",
@@ -926,7 +1036,8 @@
         "taxa de transferência"
       ],
       "category": "technology",
-      "difficulty": "hard"
+      "difficulty": "hard",
+      "concept": "technology"
     }
   ],
   "syllables": [

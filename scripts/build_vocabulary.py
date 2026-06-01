@@ -123,13 +123,27 @@ throughput|taxa de transferência|technology|hard
 """.strip()
 
 BLOCKED_SYLLABLES = {"dn", "dj", "fn", "hm", "hr", "kb", "ng", "pn", "ps", "rh", "tz"}
+CONCEPTS = {
+    "shirt": "clothing", "shoe": "clothing", "pants": "clothing", "coat": "clothing", "dress": "clothing", "clothes": "clothing",
+    "apple": "food", "coffee": "food", "breakfast": "food", "dinner": "food", "water": "food", "food": "food",
+    "house": "home", "door": "home", "table": "home", "bed": "home", "bathroom": "home", "kitchen": "home", "garden": "home",
+    "family": "people", "friend": "people", "neighbor": "people", "acquaintance": "people",
+    "airport": "transport", "bus": "transport", "train": "transport", "ticket": "transport", "passport": "transport",
+    "hotel": "travel_place", "beach": "travel_place", "city": "travel_place", "landmark": "travel_place",
+    "work": "career", "job": "career", "career": "career", "salary": "career", "promotion": "career",
+    "boss": "office_people", "team": "office_people", "manager": "office_people", "leadership": "office_people",
+    "office": "office", "meeting": "office", "email": "office", "deadline": "office", "schedule": "office", "task": "office",
+    "computer": "device", "keyboard": "device", "mouse": "device", "screen": "device", "phone": "device", "device": "device",
+    "cloud": "software", "file": "software", "website": "software", "app": "software", "browser": "software", "database": "software",
+    "password": "security", "network": "network", "bandwidth": "network", "encryption": "security",
+}
 
 
 def parse_words():
     translations = []
     for line in WORDS.splitlines():
         english, *values, category, difficulty = line.split("|")
-        translations.append({"en": english, "pt": values, "category": category, "difficulty": difficulty})
+        translations.append({"en": english, "pt": values, "category": category, "difficulty": difficulty, "concept": CONCEPTS.get(english, category)})
     return translations
 
 
