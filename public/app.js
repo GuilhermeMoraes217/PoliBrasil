@@ -9,6 +9,7 @@ const state = {
   room: null,
   roomCode: null,
   pollTimer: null,
+  pollInFlight: false,
   timer: null,
   selectedMode: "translation",
   selectedDifficulty: "easy",
@@ -183,19 +184,31 @@ function startRoom(room) {
   state.roomCode = room.code;
   state.lastRound = -1;
   renderRoom();
-  clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(refreshRoom, 700);
+  scheduleRoomRefresh();
 }
 
 async function refreshRoom() {
-  if (!state.roomCode) return;
+  if (!state.roomCode || state.pollInFlight) return;
+  state.pollInFlight = true;
+  let keepPolling = true;
   try {
     state.room = (await api(`/rooms/${state.roomCode}`)).room;
     renderRoom();
   } catch (error) {
-    clearInterval(state.pollTimer);
+    clearTimeout(state.pollTimer);
+    keepPolling = false;
     toast(error.message);
+  } finally {
+    state.pollInFlight = false;
+    if (keepPolling) scheduleRoomRefresh();
   }
+}
+
+function scheduleRoomRefresh() {
+  clearTimeout(state.pollTimer);
+  if (!state.roomCode) return;
+  const delay = document.hidden ? 5000 : state.room?.status === "playing" ? 800 : 2500;
+  state.pollTimer = setTimeout(refreshRoom, delay);
 }
 
 function renderRoom() {
@@ -302,7 +315,7 @@ async function requestRematch() {
 
 async function leaveAndGoHome() {
   const code = state.roomCode;
-  clearInterval(state.pollTimer);
+  clearTimeout(state.pollTimer);
   clearInterval(state.timer);
   state.room = null;
   state.roomCode = null;
