@@ -9,6 +9,7 @@ const state = {
   room: null,
   roomCode: null,
   context: null,
+  contextPollTimer: null,
   pollTimer: null,
   pollInFlight: false,
   timer: null,
@@ -59,6 +60,7 @@ function bindInterface() {
   $("#finish-home").addEventListener("click", leaveAndGoHome);
   $("#open-context").addEventListener("click", () => $("#context-modal").showModal());
   $("#start-context").addEventListener("click", startContext);
+  $("#join-context").addEventListener("click", joinContext);
   $("#leave-context").addEventListener("click", leaveContext);
   $("#context-form").addEventListener("submit", submitContextWord);
   window.addEventListener("beforeunload", notifyLeaveOnUnload);
@@ -115,6 +117,7 @@ async function handleAuth() {
 async function logout() {
   try {
     if (state.roomCode) await leaveAndGoHome();
+    if (state.context) leaveContext();
     await state.firebase.signOut(state.auth);
     state.user = null;
     renderIdentity();
@@ -198,10 +201,39 @@ async function startContext() {
       body: { difficulty: $("#context-difficulty").value, category: $("#context-category").value }
     });
     $("#context-modal").close();
-    state.context = context;
+    enterContext(context);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function joinContext() {
+  const code = $("#context-join-code").value.trim().toUpperCase();
+  if (code.length !== 6) return toast("Digite um código de 6 caracteres");
+  try {
+    const { context } = await api(`/contexts/${code}/join`, { method: "POST", body: {} });
+    $("#context-modal").close();
+    enterContext(context);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function enterContext(context) {
+  state.context = context;
+  renderContext();
+  showScreen("context");
+  $("#context-input").focus();
+  clearTimeout(state.contextPollTimer);
+  state.contextPollTimer = setTimeout(refreshContext, 900);
+}
+
+async function refreshContext() {
+  if (!state.context) return;
+  try {
+    state.context = (await api(`/contexts/${state.context.code}`)).context;
     renderContext();
-    showScreen("context");
-    $("#context-input").focus();
+    state.contextPollTimer = setTimeout(refreshContext, document.hidden ? 4000 : 900);
   } catch (error) {
     toast(error.message);
   }
@@ -248,28 +280,29 @@ async function sendContextGuess(value) {
 
 function renderContext() {
   const context = state.context;
-  $("#context-meta").textContent = `${context.difficulty.toUpperCase()} · ${context.category.toUpperCase()}`;
+  $("#context-meta").textContent = `ROOM #${context.code} · ${context.difficulty.toUpperCase()} · ${context.category.toUpperCase()}`;
   $("#context-count").textContent = context.guesses.length;
-  $("#context-guesses").innerHTML = context.guesses.length ? context.guesses.map((guess) => `
+  $("#context-scoreboard").innerHTML = Object.values(context.players).sort((one, two) => two.score - one.score).map((player) => `
+    <span>${escapeHtml(player.name)} · ${player.score || 0} XP</span>
+  `).join("");
+  $("#context-guesses").innerHTML = context.guesses.length ? [...context.guesses].reverse().map((guess) => `
     <li title="${escapeHtml(guess.translation)}">
       <b class="context-rank">${guess.proximity}</b>
       <span class="context-word">${escapeHtml(guess.word)}</span>
+      <span class="context-player">${escapeHtml(guess.player)} +${guess.points}</span>
       <button class="context-info" type="button" title="${escapeHtml(guess.translation)}" aria-label="Tradução: ${escapeHtml(guess.translation)}">i</button>
       <span class="context-meter"><i style="width:${100 - guess.proximity}%"></i></span>
     </li>
   `).join("") : '<li class="empty">Nenhuma tentativa ainda.</li>';
-  if (context.status === "solved") {
-    $("#context-feedback").textContent = `Encontrou! ${context.secret.en} = ${context.secret.pt[0]}.`;
-    $("#context-feedback").className = "feedback correct";
-    $("#context-input").disabled = true;
-  } else {
-    $("#context-feedback").textContent = context.learningNote || "Quanto menor o número, mais perto você está. Zero é a resposta correta.";
-    $("#context-feedback").className = "feedback";
-    $("#context-input").disabled = false;
-  }
+  $("#context-feedback").textContent = context.lastSolved
+    ? `${context.lastSolved.player} encontrou ${context.lastSolved.word} = ${context.lastSolved.translation}. Nova palavra liberada!`
+    : context.learningNote || "Quanto menor o número, mais perto você está. Zero libera uma nova palavra.";
+  $("#context-feedback").className = context.lastSolved ? "feedback correct" : "feedback";
+  $("#context-input").disabled = false;
 }
 
 function leaveContext() {
+  clearTimeout(state.contextPollTimer);
   state.context = null;
   $("#context-input").value = "";
   $("#context-suggestion").classList.add("hidden");

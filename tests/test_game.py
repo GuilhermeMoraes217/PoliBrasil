@@ -117,11 +117,12 @@ class GameEngineTest(unittest.TestCase):
 
     def test_context_secret_stays_hidden_until_solved(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
-        context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1"}
+        context = {"status": "playing", "secret": secret, "guesses": [], "code": "RADAR1", "players": {"one": self.player_one.copy()}, "round": 1, "difficulty": "easy", "category": "everyday", "usedSecrets": ["apple"]}
         self.assertNotIn("secret", server.public_context(context))
-        context = server.apply_context_guess(context, "apple")
+        context = server.apply_context_guess(context, "one", "apple")
         self.assertEqual(context["guesses"][0]["proximity"], 0)
-        self.assertEqual(server.public_context(context)["secret"]["en"], "apple")
+        self.assertEqual(context["lastSolved"]["word"], "apple")
+        self.assertNotIn("secret", server.public_context(context))
 
     def test_context_suggests_english_word_from_portuguese(self):
         suggestions = server.find_translation_suggestions("maçã")
@@ -133,10 +134,10 @@ class GameEngineTest(unittest.TestCase):
 
     def test_context_rejects_repeated_guess(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
-        context = {"status": "playing", "secret": secret, "guesses": []}
-        context = server.apply_context_guess(context, "book")
+        context = {"status": "playing", "secret": secret, "guesses": [], "players": {"one": self.player_one.copy()}, "round": 1}
+        context = server.apply_context_guess(context, "one", "book")
         with self.assertRaises(ValueError):
-            server.apply_context_guess(context, "book")
+            server.apply_context_guess(context, "one", "book")
 
     def test_context_uses_freedict_portuguese_fallback(self):
         suggestions = server.find_translation_suggestions("abelha")
@@ -144,8 +145,8 @@ class GameEngineTest(unittest.TestCase):
 
     def test_context_accepts_freedict_english_guess_and_teaches_translation(self):
         secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
-        context = {"status": "playing", "secret": secret, "guesses": []}
-        context = server.apply_context_guess(context, "bee")
+        context = {"status": "playing", "secret": secret, "guesses": [], "players": {"one": self.player_one.copy()}, "round": 1}
+        context = server.apply_context_guess(context, "one", "bee")
         self.assertIn("em inglês: bee", context["learningNote"])
 
     def test_context_semantic_concept_ranks_related_word_closer(self):
@@ -153,6 +154,17 @@ class GameEngineTest(unittest.TestCase):
         dress = next(item for item in server.VOCABULARY["translations"] if item["en"] == "dress")
         apple = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
         self.assertLess(server.context_similarity(dress, secret), server.context_similarity(apple, secret))
+
+    def test_context_scores_players_and_rotates_after_solution(self):
+        secret = next(item for item in server.VOCABULARY["translations"] if item["en"] == "apple")
+        context = {
+            "status": "playing", "secret": secret, "guesses": [], "players": {"one": self.player_one.copy()},
+            "round": 1, "difficulty": "easy", "category": "everyday", "usedSecrets": ["apple"],
+        }
+        context = server.apply_context_guess(context, "one", "apple")
+        self.assertEqual(context["players"]["one"]["score"], 200)
+        self.assertEqual(context["round"], 2)
+        self.assertNotEqual(context["secret"]["en"], "apple")
 
 
 if __name__ == "__main__":

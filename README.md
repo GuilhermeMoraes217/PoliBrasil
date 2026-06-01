@@ -14,7 +14,7 @@ Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um o
 
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
-- Modo solo `Word Radar`: descubra uma palavra inglesa por aproximação e aprenda traduções durante as tentativas.
+- Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
@@ -22,7 +22,7 @@ Abra `http://localhost:8000`. Para iniciar uma partida demonstrativa contra um o
 - Validação autoritativa de respostas no backend Python.
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
 
-No `Word Radar`, o backend mantém a palavra secreta oculta até a vitória. O jogador pode digitar uma palavra em português para receber uma sugestão inglesa antes do envio. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta; `0` indica acerto.
+No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode criar uma sala ou entrar em uma existente, digitar uma palavra em português para receber uma sugestão inglesa e competir por XP com outras pessoas. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta. Ao chegar em `0`, o jogador recebe bônus e uma nova palavra é liberada sem encerrar a sala.
 
 Para ampliar as sugestões offline português→inglês, o projeto também usa o dicionário livre [FreeDict eng-por](https://download.freedict.org/dictionaries/eng-por/0.3/), sob licença GPL-2.0-or-later. O índice processado possui mais de 15 mil verbetes ingleses e 17 mil traduções portuguesas. Nenhum dicionário finito cobre literalmente todas as palavras e flexões possíveis, mas essa camada oferece um fallback amplo além da curadoria pedagógica.
 

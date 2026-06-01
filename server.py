@@ -140,8 +140,6 @@ def context_similarity(guess: dict, secret: dict) -> int:
 
 def public_context(context: dict) -> dict:
     public = {key: value for key, value in context.items() if key != "secret"}
-    if context["status"] == "solved":
-        public["secret"] = context["secret"]
     return public
 
 
@@ -159,7 +157,19 @@ def find_translation_suggestions(value: str) -> list[dict]:
     return suggestions[:5]
 
 
-def apply_context_guess(context: dict, value: str) -> dict:
+def choose_context_secret(context: dict) -> dict:
+    candidates = context_candidates(context["difficulty"], context["category"])
+    used = context.setdefault("usedSecrets", [])
+    available = [item for item in candidates if item["en"] not in used]
+    if not available:
+        used.clear()
+        available = candidates
+    secret = random.choice(available)
+    used.append(secret["en"])
+    return secret
+
+
+def apply_context_guess(context: dict, uid: str, value: str) -> dict:
     normalized = normalize(value)
     candidate = next((item for item in VOCABULARY["translations"] if normalize(item["en"]) == normalized), None)
     if not candidate and normalized in FREEDICT["english"]:
@@ -167,14 +177,25 @@ def apply_context_guess(context: dict, value: str) -> dict:
         candidate = {"en": freedict_word["word"], "pt": freedict_word["translations"], "category": "general", "difficulty": "unknown"}
     if not candidate:
         raise ValueError("Digite uma palavra em inglês cadastrada ou use uma sugestão em português")
-    if any(item["word"] == candidate["en"] for item in context["guesses"]):
+    if any(item["word"] == candidate["en"] and item["round"] == context["round"] for item in context["guesses"]):
         raise ValueError("Esta palavra já foi enviada")
     proximity = context_similarity(candidate, context["secret"])
     context["learningNote"] = f"{candidate['pt'][0]} em inglês: {candidate['en']}"
-    context["guesses"].append({"word": candidate["en"], "translation": candidate["pt"][0], "proximity": proximity})
-    context["guesses"].sort(key=lambda item: item["proximity"])
+    context["lastSolved"] = None
+    points = max(1, 100 - proximity)
+    solved = proximity == 0
+    if solved:
+        points += 100
+    player = context["players"][uid]
+    player["score"] = player.get("score", 0) + points
+    context["guesses"].append({
+        "word": candidate["en"], "translation": candidate["pt"][0], "proximity": proximity,
+        "points": points, "uid": uid, "player": player["name"], "round": context["round"],
+    })
     if proximity == 0:
-        context["status"] = "solved"
+        context["lastSolved"] = {"word": context["secret"]["en"], "translation": context["secret"]["pt"][0], "uid": uid, "player": player["name"]}
+        context["round"] += 1
+        context["secret"] = choose_context_secret(context)
     return context
 
 
@@ -345,7 +366,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.create_room(user, payload)
         if path == "/api/contexts":
             return self.create_context(user, payload)
-        context_match = re.fullmatch(r"/api/contexts/([A-Z0-9]{6})/(suggest|guess)", path)
+        context_match = re.fullmatch(r"/api/contexts/([A-Z0-9]{6})/(join|suggest|guess)", path)
         if context_match:
             code, action = context_match.groups()
             return getattr(self, f"{action}_context")(code, user, payload)
@@ -362,25 +383,36 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "Nível ou categoria inválidos"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             code = random_code()
-            secret = random.choice(context_candidates(difficulty, category))
             context = {
                 "code": code, "owner": user["uid"], "difficulty": difficulty, "category": category,
-                "status": "playing", "createdAt": now_ms(), "guesses": [], "secret": secret,
+                "status": "playing", "createdAt": now_ms(), "guesses": [], "round": 1,
+                "players": {user["uid"]: self.player_from_user(user)}, "usedSecrets": [],
             }
+            context["secret"] = choose_context_secret(context)
             write_context(database, context)
         return self.send_json({"context": public_context(context)}, status=201)
 
     def get_context(self, code: str, user: dict):
         with closing(connect_db()) as database, database:
             context = read_context(database, code)
-        if not context or context["owner"] != user["uid"]:
+        if not context or user["uid"] not in context["players"]:
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
+        return self.send_json({"context": public_context(context)})
+
+    def join_context(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            context = read_context(database, code)
+            if not context:
+                return self.send_json({"error": "Sala Word Radar não encontrada"}, status=404)
+            context["players"][user["uid"]] = self.player_from_user(user)
+            write_context(database, context)
         return self.send_json({"context": public_context(context)})
 
     def suggest_context(self, code: str, user: dict, payload: dict):
         with closing(connect_db()) as database, database:
             context = read_context(database, code)
-        if not context or context["owner"] != user["uid"]:
+        if not context or user["uid"] not in context["players"]:
             return self.send_json({"error": "Desafio não encontrado"}, status=404)
         value = str(payload.get("value", ""))
         known_english = any(normalize(item["en"]) == normalize(value) for item in VOCABULARY["translations"]) or normalize(value) in FREEDICT["english"]
@@ -389,12 +421,10 @@ class PoliHandler(SimpleHTTPRequestHandler):
     def guess_context(self, code: str, user: dict, payload: dict):
         with LOCK, closing(connect_db()) as database, database:
             context = read_context(database, code)
-            if not context or context["owner"] != user["uid"]:
+            if not context or user["uid"] not in context["players"]:
                 return self.send_json({"error": "Desafio não encontrado"}, status=404)
-            if context["status"] == "solved":
-                return self.send_json({"context": public_context(context)})
             try:
-                context = apply_context_guess(context, str(payload.get("value", "")))
+                context = apply_context_guess(context, user["uid"], str(payload.get("value", "")))
             except ValueError as error:
                 return self.send_json({"error": str(error)}, status=400)
             write_context(database, context)
