@@ -44,7 +44,7 @@ function bindInterface() {
   $$("[data-go-home]").forEach((button) => button.addEventListener("click", leaveAndGoHome));
   $("#create-room").addEventListener("click", createRoom);
   $("#join-room").addEventListener("click", joinRoom);
-  $("#auth-button").addEventListener("click", login);
+  $("#auth-button").addEventListener("click", handleAuth);
   $("#answer-form").addEventListener("submit", submitAnswer);
   $("#room-code").addEventListener("click", copyCode);
   $("#copy-invite").addEventListener("click", copyInvite);
@@ -94,6 +94,25 @@ async function login() {
   }
 }
 
+async function handleAuth() {
+  if (state.user?.displayName && !state.demo) return logout();
+  return login();
+}
+
+async function logout() {
+  try {
+    if (state.roomCode) await leaveAndGoHome();
+    await state.firebase.signOut(state.auth);
+    state.user = null;
+    renderIdentity();
+    renderHistory([]);
+    toast("Logout realizado");
+  } catch (error) {
+    console.error(error);
+    toast("Não foi possível sair");
+  }
+}
+
 async function ensureUser() {
   if (state.user) return state.user;
   if (state.demo) return state.user;
@@ -121,7 +140,9 @@ async function api(path, options = {}) {
 }
 
 function renderIdentity() {
-  $("#auth-button").textContent = state.user?.displayName ? shortName(state.user.displayName) : "login_google()";
+  const loggedWithGoogle = state.user?.displayName && !state.demo;
+  $("#user-label").textContent = loggedWithGoogle ? shortName(state.user.displayName) : "";
+  $("#auth-button").textContent = loggedWithGoogle ? "logout()" : "login_google()";
 }
 
 function selectMode(mode) {

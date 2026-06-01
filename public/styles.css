@@ -37,6 +37,7 @@ button { cursor: pointer; }
 .brand strong { display: block; letter-spacing: 5px; font-family: "Press Start 2P"; font-size: 13px; }
 .brand small { color: var(--muted); display: block; font-size: 9px; letter-spacing: 3px; margin-top: 5px; }
 .topbar-actions { align-items: center; color: var(--muted); display: flex; gap: 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.user-label { color: var(--green); }
 .online-dot { width: 7px; height: 7px; background: var(--green); box-shadow: 0 0 12px var(--green); border-radius: 50%; }
 main { margin: auto; max-width: 1180px; padding: 64px 22px; }
 .screen { display: none; }
