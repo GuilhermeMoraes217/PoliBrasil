@@ -2,6 +2,11 @@
 
 Jogo multiplayer de duelos para praticar inglês, com visual retro inspirado em terminal.
 
+## Documentação oficial
+
+- [Documento Word](docs/Poli-English-Duel-Documentacao-Oficial.docx)
+- [Fonte Markdown versionável](docs/Poli-English-Duel-Documentacao-Oficial.md)
+
 ## Rodar localmente
 
 ```powershell
