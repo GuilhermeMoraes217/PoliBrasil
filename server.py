@@ -356,8 +356,14 @@ class PoliHandler(SimpleHTTPRequestHandler):
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
                 firebase_user = json.load(response)["users"][0]
-        except (urllib.error.URLError, KeyError, IndexError):
+        except urllib.error.HTTPError:
             self.send_json({"error": "Sessão inválida"}, status=401)
+            return None
+        except urllib.error.URLError:
+            self.send_json({"error": "Não foi possível validar a sessão com o Firebase"}, status=503)
+            return None
+        except (KeyError, IndexError):
+            self.send_json({"error": "Resposta inválida recebida do Firebase"}, status=502)
             return None
         user = {"uid": firebase_user["localId"], "name": firebase_user.get("displayName", "GUEST_PLAYER").upper().replace(" ", "_"), "photo": firebase_user.get("photoUrl", "")}
         TOKEN_CACHE[token] = (time.time() + 300, user)
