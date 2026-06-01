@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#07110d">
+    <title>Poli English Duel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="scanlines"></div>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">P&gt;</span>
+        <span><strong>POLI</strong><small>ENGLISH_DUEL</small></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="online-dot"></span>
+        <span id="connection-label">demo local</span>
+        <button id="auth-button" class="button ghost compact">login_google()</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home-screen" class="screen active">
+        <div class="hero">
+          <div>
+            <p class="eyebrow">// VOCABULARY BATTLE ARENA</p>
+            <h1>LEVEL UP<br><span>YOUR ENGLISH.</span></h1>
+            <p class="hero-copy">Entre em duelos rápidos, mantenha seus corações e transforme palavras novas em XP.</p>
+            <div class="hero-buttons">
+              <button class="button primary" data-open-modal="create">CRIAR DUELO <b>↗</b></button>
+              <button class="button secondary" data-open-modal="join">ENTRAR COM CÓDIGO</button>
+            </div>
+          </div>
+          <div class="terminal-card">
+            <div class="window-bar"><i></i><i></i><i></i><span>daily_quest.sh</span></div>
+            <div class="terminal-body">
+              <p><span>$</span> poli quest --today</p>
+              <p class="muted">Carregando missão diária...</p>
+              <div class="quest-row"><b>01</b><span>Vença um duelo</span><em>+120 XP</em></div>
+              <div class="quest-row"><b>02</b><span>Responda 5 palavras</span><em>+80 XP</em></div>
+              <div class="progress"><i style="width: 42%"></i></div>
+              <p class="terminal-ready">READY_PLAYER_ONE<span class="cursor">_</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div><p class="eyebrow">// SELECT_GAME_MODE</p><h2>ESCOLHA SEU DESAFIO</h2></div>
+          <span>2 MODOS DISPONÍVEIS</span>
+        </div>
+        <div class="mode-grid">
+          <article class="mode-card green">
+            <div class="mode-top"><span>MODE_01</span><i>10s</i></div>
+            <div class="pixel-icon">A<span>↔</span>Á</div>
+            <h3>TRANSLATION<br>RUSH</h3>
+            <p>Traduza palavras entre inglês e português antes que o cronômetro zere.</p>
+            <button class="text-button" data-mode="translation" data-open-modal="create">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+          <article class="mode-card purple">
+            <div class="mode-top"><span>MODE_02</span><i>TURN</i></div>
+            <div class="pixel-icon">SY<span>_</span></div>
+            <h3>SYLLABLE<br>STRIKE</h3>
+            <p>Receba uma sílaba e responda uma palavra em inglês. Errou? Perde um coração.</p>
+            <button class="text-button" data-mode="syllable" data-open-modal="create">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+        </div>
+        <div class="dashboard-grid">
+          <section class="dashboard-card">
+            <p class="eyebrow">// GLOBAL_RANKING</p>
+            <h3>TOP PLAYERS</h3>
+            <ol id="ranking-list" class="score-list"><li><span>Carregando ranking...</span></li></ol>
+          </section>
+          <section class="dashboard-card">
+            <p class="eyebrow">// MATCH_HISTORY</p>
+            <h3>ÚLTIMOS DUELOS</h3>
+            <ul id="history-list" class="score-list"><li><span>Faça login para registrar partidas.</span></li></ul>
+          </section>
+        </div>
+      </section>
+
+      <section id="lobby-screen" class="screen">
+        <button class="back-button" data-go-home>← voltar_ao_menu</button>
+        <div class="lobby-card">
+          <p class="eyebrow">// WAITING_ROOM</p>
+          <h2>AGUARDANDO<br>OPONENTE<span class="cursor">_</span></h2>
+          <p>Compartilhe este código para iniciar a batalha:</p>
+          <button id="room-code" class="room-code" title="Copiar código">------</button>
+          <p class="small-note">Clique para copiar</p>
+          <div class="invite-box">
+            <span id="invite-link">http://localhost:8000/?room=------</span>
+            <button id="copy-invite" class="button secondary compact">COPIAR LINK</button>
+          </div>
+          <div class="players-preview">
+            <div class="player-chip"><div id="lobby-avatar" class="avatar">P1</div><b id="lobby-name">PLAYER_01</b><span>READY</span></div>
+            <div class="versus">VS</div>
+            <div class="player-chip waiting"><div class="avatar">?</div><b>PLAYER_02</b><span>WAITING...</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen">
+        <div class="battle-top">
+          <button class="back-button" data-go-home>← sair_da_partida</button>
+          <span id="battle-mode">TRANSLATION_RUSH</span>
+          <span id="battle-room">ROOM #------</span>
+        </div>
+        <div class="fighters">
+          <div class="fighter active" id="player-one">
+            <div class="avatar" id="p1-avatar">P1</div>
+            <div><b id="p1-name">PLAYER_01</b><span id="p1-score">000 XP</span></div>
+            <div class="hearts" id="p1-hearts">♥ ♥ ♥</div>
+          </div>
+          <div class="versus big">VS</div>
+          <div class="fighter" id="player-two">
+            <div class="avatar purple-avatar" id="p2-avatar">P2</div>
+            <div><b id="p2-name">PLAYER_02</b><span id="p2-score">000 XP</span></div>
+            <div class="hearts" id="p2-hearts">♥ ♥ ♥</div>
+          </div>
+        </div>
+        <div class="arena-card">
+          <div class="timer"><i id="timer-bar"></i></div>
+          <p id="turn-label" class="eyebrow">// SUA_VEZ</p>
+          <p id="prompt-hint" class="prompt-hint">TRADUZA PARA PORTUGUÊS</p>
+          <h2 id="prompt-word">READY?</h2>
+          <form id="answer-form">
+            <input id="answer-input" autocomplete="off" placeholder="digite_sua_resposta..." maxlength="32">
+            <button class="button primary" type="submit">ENVIAR ↵</button>
+          </form>
+          <p id="feedback" class="feedback">A batalha vai começar...</p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="create-modal" class="modal">
+      <button class="close-modal" aria-label="Fechar">×</button>
+      <p class="eyebrow">// CREATE_NEW_ROOM</p>
+      <h2>NOVO DUELO</h2>
+      <label>ESCOLHA O MODO</label>
+      <div class="modal-modes">
+        <button class="mode-choice selected" data-choice="translation"><b>01</b><span>Translation Rush</span></button>
+        <button class="mode-choice" data-choice="syllable"><b>02</b><span>Syllable Strike</span></button>
+      </div>
+      <label>NÍVEL DO VOCABULÁRIO</label>
+      <div class="difficulty-grid">
+        <button class="difficulty-choice selected" data-difficulty="easy">EASY</button>
+        <button class="difficulty-choice" data-difficulty="medium">MEDIUM</button>
+        <button class="difficulty-choice" data-difficulty="hard">HARD</button>
+      </div>
+      <button id="create-room" class="button primary wide">GERAR CÓDIGO DA SALA</button>
+    </dialog>
+
+    <dialog id="finish-modal" class="modal finish-modal">
+      <p id="finish-result" class="eyebrow">// YOU_WIN</p>
+      <h2 id="finish-title">PLAYER venceu!</h2>
+      <p id="finish-reason" class="muted">Fim da batalha. XP registrado no ranking.</p>
+      <button id="rematch-button" class="button primary wide">PEDIR REVANCHE</button>
+      <button id="finish-home" class="button secondary wide">VOLTAR AO MENU</button>
+    </dialog>
+
+    <dialog id="join-modal" class="modal">
+      <button class="close-modal" aria-label="Fechar">×</button>
+      <p class="eyebrow">// JOIN_EXISTING_ROOM</p>
+      <h2>ENTRAR NO DUELO</h2>
+      <label for="join-code">CÓDIGO DA SALA</label>
+      <input id="join-code" class="code-input" placeholder="ABC123" maxlength="6">
+      <button id="join-room" class="button primary wide">CONECTAR À SALA</button>
+    </dialog>
+
+    <div id="toast" class="toast"></div>
+    <script src="/firebase-config.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

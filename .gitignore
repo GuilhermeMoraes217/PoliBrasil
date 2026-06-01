@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/poli.db
+data/poli.db-shm
+data/poli.db-wal
+data/test-*.db*

@@ -1,0 +1,76 @@
+import unittest
+from contextlib import closing
+from pathlib import Path
+from uuid import uuid4
+
+import server
+
+
+class GameEngineTest(unittest.TestCase):
+    def setUp(self):
+        server.DATABASE = Path(server.ROOT) / "data" / f"test-{uuid4().hex}.db"
+        server.initialize_db()
+        self.player_one = {"uid": "one", "name": "PLAYER_ONE", "photo": "", "hearts": 3, "score": 0}
+        self.player_two = {"uid": "two", "name": "PLAYER_TWO", "photo": "", "hearts": 3, "score": 0}
+
+    def tearDown(self):
+        for suffix in ("", "-shm", "-wal"):
+            database_file = Path(f"{server.DATABASE}{suffix}")
+            if database_file.exists():
+                database_file.unlink()
+
+    def room(self, mode="translation", difficulty="easy"):
+        room = {
+            "code": "ABC123",
+            "mode": mode,
+            "difficulty": difficulty,
+            "status": "playing",
+            "round": 0,
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()},
+        }
+        return server.next_round(room)
+
+    def test_public_room_hides_answers(self):
+        room = self.room()
+        self.assertNotIn("answers", server.public_room(room)["prompt"])
+        self.assertIn("answers", room["prompt"])
+
+    def test_correct_translation_adds_xp(self):
+        room = self.room()
+        answer = room["prompt"]["answers"][0]
+        with closing(server.connect_db()) as database, database:
+            room = server.apply_answer(database, room, "one", answer)
+        self.assertEqual(room["players"]["one"]["score"], 100)
+        self.assertEqual(room["players"]["one"]["hearts"], 3)
+
+    def test_syllable_mode_rejects_uncatalogued_word(self):
+        room = self.room(mode="syllable")
+        invented_word = f"{room['prompt']['word']}zzzz"
+        with closing(server.connect_db()) as database, database:
+            room = server.apply_answer(database, room, "one", invented_word)
+        self.assertEqual(room["players"]["one"]["hearts"], 2)
+
+    def test_abandonment_records_ranking_and_history(self):
+        room = self.room()
+        with closing(server.connect_db()) as database, database:
+            room = server.finish_room(database, room, "two", "abandoned")
+            server.write_room(database, room)
+            ranking = database.execute("SELECT wins FROM rankings WHERE uid = 'two'").fetchone()
+            history = database.execute("SELECT result FROM history WHERE uid = 'one'").fetchone()
+        self.assertEqual(room["status"], "finished")
+        self.assertEqual(ranking["wins"], 1)
+        self.assertEqual(history["result"], "loss")
+
+    def test_next_round_restores_match_state_for_rematch(self):
+        room = self.room()
+        room["players"]["one"]["hearts"] = 0
+        room.update({"status": "playing", "round": 0})
+        for player in room["players"].values():
+            player.update({"hearts": 3, "score": 0})
+        room = server.next_round(room)
+        self.assertEqual(room["round"], 1)
+        self.assertEqual(room["players"]["one"]["hearts"], 3)
+
+
+if __name__ == "__main__":
+    unittest.main()
