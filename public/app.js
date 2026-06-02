@@ -492,6 +492,7 @@ function renderBomb() {
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
   $("#bomb-players").innerHTML = players.map((player, index) => `
     <div class="bomb-player ${player.uid === bomb.turn ? "active" : ""} ${player.hearts <= 0 ? "out" : ""}">
+      <strong class="bomb-turn-arrow">${player.uid === bomb.turn ? "▶" : ""}</strong>
       <span class="bomb-position">${String(index + 1).padStart(2, "0")}</span>
       <b>${escapeHtml(player.name)}</b>
       <span>${player.score || 0} XP · ${"♥".repeat(player.hearts || 0)}${"♡".repeat(3 - (player.hearts || 0))}</span>
@@ -499,11 +500,12 @@ function renderBomb() {
     </div>
   `).join("");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
-  $("#bomb-prompt").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
-  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} está digitando ao vivo:`;
+  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
+  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} completa a palavra ao vivo:`;
   $("#bomb-input").disabled = !canAnswer;
-  $("#bomb-input").placeholder = canAnswer ? "digite_uma_palavra..." : "aguarde_seu_turno...";
-  $("#bomb-live-typing").textContent = state.bombTypingByUid[bomb.turn]?.value || "...";
+  $("#bomb-input").placeholder = canAnswer ? "digite_apenas_o_restante..." : "aguarde_seu_turno...";
+  const liveTyping = state.bombTypingByUid[bomb.turn] || {};
+  $("#bomb-live-typing").textContent = liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
   $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
   const allReady = players.length >= 2 && players.every((player) => player.ready);
@@ -516,6 +518,7 @@ function renderBomb() {
     if (canAnswer) focusInput("#bomb-input");
   } else {
     clearInterval(state.bombTimer);
+    $("#bomb-screen").classList.remove("danger");
   }
   if (bomb.status === "finished") renderBombFinished();
 }
@@ -542,6 +545,7 @@ function startBombTimer() {
     const remaining = Math.min(ROUND_MS, Math.max(0, Number(state.bomb.deadline) - (Date.now() + state.serverOffset)));
     $("#bomb-timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
     $("#bomb-timer-number").textContent = Math.ceil(remaining / 1000);
+    $("#bomb-screen").classList.toggle("danger", remaining > 0 && remaining <= 3000);
     if (remaining <= 0) refreshBomb();
   };
   tick();
@@ -599,8 +603,8 @@ function subscribeBombTyping() {
   state.bombTypingUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
     state.bombTypingByUid = snapshot.val() || {};
     const typing = state.bombTypingByUid[state.bomb?.turn] || {};
-    state.bombTypingValue = typing.value || "";
-    $("#bomb-live-typing").textContent = state.bombTypingValue || "...";
+    state.bombTypingValue = typing.round === state.bomb?.round ? typing.value || "" : "";
+    $("#bomb-live-typing").textContent = state.bombTypingValue;
   });
 }
 
@@ -611,6 +615,7 @@ async function publishBombTyping() {
   await state.firebaseDatabase.set(reference, {
     uid: state.user.uid,
     value: $("#bomb-input").value.slice(0, 32),
+    round: state.bomb.round,
     updatedAt: Date.now()
   });
 }
@@ -636,7 +641,8 @@ async function leaveBomb() {
   state.bombTypingUnsubscribe = null;
   state.bomb = null;
   $("#bomb-input").value = "";
-  $("#bomb-live-typing").textContent = "...";
+  $("#bomb-live-typing").textContent = "";
+  $("#bomb-screen").classList.remove("danger");
   showScreen("home");
   if (bomb) {
     try { await api(`/bombs/${bomb.code}/leave`, { method: "POST", body: {} }); } catch {}

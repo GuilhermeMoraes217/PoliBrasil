@@ -345,9 +345,8 @@ def bomb_dictionary(language: str) -> set[str]:
 def build_bomb_prompts(language: str) -> list[str]:
     frequency: dict[str, int] = {}
     for word in bomb_dictionary(language):
-        for index in range(len(word) - 1):
-            prompt = word[index:index + 2]
-            frequency[prompt] = frequency.get(prompt, 0) + 1
+        prompt = word[:2]
+        frequency[prompt] = frequency.get(prompt, 0) + 1
     return [prompt for prompt, count in frequency.items() if count >= 12]
 
 
@@ -419,10 +418,10 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
 def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer: str) -> tuple[dict, bool]:
     if bomb["status"] != "playing" or bomb.get("turn") != uid:
         return bomb, False
-    normalized = normalize(answer)
+    normalized = f"{bomb['prompt']}{normalize(answer)}"
     valid = (
         len(normalized) >= 3
-        and bomb["prompt"] in normalized
+        and normalized.startswith(bomb["prompt"])
         and normalized in BOMB_WORDS[bomb["language"]]
         and normalized not in bomb.setdefault("usedWords", {})
     )

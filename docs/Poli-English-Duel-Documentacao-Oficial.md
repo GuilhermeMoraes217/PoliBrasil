@@ -197,13 +197,16 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - Uma sala aceita até oito participantes.
 - Cada jogador marca seu estado como pronto no lobby.
 - A partida não começa automaticamente: somente o host pode iniciá-la, e o botão fica disponível quando todos estiverem prontos.
-- O backend apresenta um trecho obrigatório de duas letras e alterna os turnos entre os jogadores ativos.
-- A palavra enviada deve existir no dicionário, conter o trecho apresentado e ainda não ter sido utilizada na partida.
+- O backend apresenta um prefixo obrigatório de duas letras e alterna os turnos entre os jogadores ativos.
+- O prefixo permanece fixo na tela. O participante digita somente o complemento: para `PA`, escreve `RADA` e envia `PARADA`.
+- A palavra montada deve existir no dicionário, começar com o prefixo apresentado e ainda não ter sido utilizada na partida.
 - Uma resposta válida concede `100 XP` e passa o turno.
 - Uma resposta inválida pode ser corrigida enquanto ainda houver tempo.
 - Quando o cronômetro de dez segundos termina, o jogador perde um coração e o turno avança.
 - O último jogador com corações vence.
-- Durante o turno, todos os participantes visualizam a digitação do jogador ativo em tempo real.
+- Durante o turno, todos os participantes visualizam a palavra sendo completada pelo jogador ativo em tempo real.
+- Uma seta destaca explicitamente o jogador responsável pelo turno.
+- Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
 
 ### Arquitetura híbrida
 

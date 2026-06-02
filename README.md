@@ -63,7 +63,7 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
 - Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
-- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host e digitação ao vivo via Firebase Realtime Database.
+- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, prefixo fixo e complemento digitado ao vivo via Firebase Realtime Database.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
