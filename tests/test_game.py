@@ -292,6 +292,25 @@ class GameEngineTest(unittest.TestCase):
             self.assertNotIn("mm", server.BOMB_PROMPTS["pt"][difficulty])
             self.assertNotIn("cc", server.BOMB_PROMPTS["pt"][difficulty])
 
+    def test_word_bomb_progression_advances_sublevels_and_difficulties(self):
+        bomb = {"round": 0, "progression": {"stage": 0, "nextLevelAt": 1}}
+        server.update_bomb_progression(bomb)
+        self.assertEqual((bomb["difficulty"], bomb["sublevel"]), ("easy", 1))
+        bomb["round"] = 2
+        with patch("server.random.randint", return_value=1):
+            server.update_bomb_progression(bomb)
+        self.assertEqual((bomb["difficulty"], bomb["sublevel"]), ("easy", 2))
+        bomb["round"] = 4
+        with patch("server.random.randint", return_value=1):
+            server.update_bomb_progression(bomb)
+        self.assertEqual((bomb["difficulty"], bomb["sublevel"]), ("medium", 1))
+
+    def test_word_bomb_progression_uses_five_to_seven_round_blocks(self):
+        with patch("server.random.randint", return_value=6):
+            bomb = server.update_bomb_progression({"round": 0})
+        self.assertEqual(bomb["progression"]["nextLevelAt"], 6)
+        self.assertEqual((bomb["difficulty"], bomb["sublevel"]), ("easy", 1))
+
     def test_word_bomb_keeps_current_turn_when_other_player_leaves(self):
         bomb = {
             "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",

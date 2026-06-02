@@ -103,7 +103,7 @@ class WsgiAppTest(unittest.TestCase):
     def test_word_bomb_host_can_start_only_after_everyone_is_ready(self):
         with patch.object(server, "ALLOW_DEMO", True):
             created = self.client.post(
-                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "en", "difficulty": "hard"}
+                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "en"}
             )
             code = created.json["bomb"]["code"]
             joined = self.client.post(
@@ -122,7 +122,8 @@ class WsgiAppTest(unittest.TestCase):
                 f"/api/bombs/{code}/start", headers={"Authorization": "Bearer demo-one"}, json={}
             )
         self.assertEqual(created.status_code, 201)
-        self.assertEqual(created.json["bomb"]["difficulty"], "hard")
+        self.assertEqual(created.json["bomb"]["difficulty"], "easy")
+        self.assertEqual(created.json["bomb"]["sublevel"], 1)
         self.assertEqual(joined.status_code, 200)
         self.assertEqual(blocked.status_code, 409)
         self.assertEqual(started.status_code, 200)
@@ -149,6 +150,8 @@ class WsgiAppTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["bomb"]["status"], "waiting")
         self.assertEqual(response.json["bomb"]["round"], 0)
+        self.assertEqual(response.json["bomb"]["difficulty"], "easy")
+        self.assertEqual(response.json["bomb"]["sublevel"], 1)
         self.assertTrue(all(player["hearts"] == 3 for player in response.json["bomb"]["players"].values()))
         self.assertTrue(all(not player["ready"] for player in response.json["bomb"]["players"].values()))
 

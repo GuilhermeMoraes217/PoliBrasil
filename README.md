@@ -72,7 +72,7 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
 - Trilhas lounge opcionais geradas no navegador, sem arquivos de áudio pesados.
 
-No `Word Bomb`, o host escolhe idioma e dificuldade. O nível `easy` usa sílabas cotidianas como `CA`, `BA` e `TA`; `medium` amplia combinações frequentes; `hard` inclui trechos internos e encontros consonantais. Convites levam usuários autenticados diretamente ao lobby. Respostas em português aceitam a grafia com ou sem acento, e o botão de revanche restaura o lobby para uma nova confirmação de pronto.
+No `Word Bomb`, o host escolhe somente o idioma. A dificuldade cresce durante a partida em nove etapas: `EASY 1–3`, `MEDIUM 1–3` e `HARD 1–3`. Cada etapa dura aleatoriamente de cinco a sete rodadas. Os níveis iniciais usam sílabas cotidianas como `CA`, `BA` e `TA`; os intermediários ampliam combinações frequentes; os avançados incluem trechos internos e encontros consonantais. Convites levam usuários autenticados diretamente ao lobby. Respostas em português aceitam a grafia com ou sem acento, e o botão de revanche restaura o lobby em `EASY 1` para uma nova confirmação de pronto.
 
 No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode criar uma sala, retomar uma sala aberta ou entrar em uma existente, digitar uma palavra em português para receber uma sugestão inglesa e competir por XP com outras pessoas. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta. Ao chegar em `0`, o jogador recebe bônus e vence a sala.
 

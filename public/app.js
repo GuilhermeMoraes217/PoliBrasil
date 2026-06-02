@@ -413,7 +413,7 @@ async function loadOpenBombs() {
       ${bombs.map((bomb) => `
         <button class="context-room" type="button" data-bomb-code="${bomb.code}">
           <b>#${bomb.code}</b>
-          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bomb.difficulty.toUpperCase()} · ${bomb.status.toUpperCase()}</span>
+          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bombLevelLabel(bomb)} · ${bomb.status.toUpperCase()}</span>
         </button>
       `).join("")}
     ` : "";
@@ -425,10 +425,7 @@ async function loadOpenBombs() {
 
 async function createBomb() {
   try {
-    const { bomb } = await api("/bombs", {
-      method: "POST",
-      body: { language: $("#bomb-language").value, difficulty: $("#bomb-difficulty").value }
-    });
+    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value } });
     $("#bomb-modal").close();
     enterBomb(bomb);
   } catch (error) {
@@ -498,7 +495,7 @@ function renderBomb() {
   const me = bomb.players[state.user.uid];
   const waiting = bomb.status === "waiting";
   const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
-  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${(bomb.difficulty || "easy").toUpperCase()}`;
+  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
   const playerCard = (player, index) => `
@@ -579,6 +576,16 @@ function playerAngle(index, total) {
   if (index < 0 || total < 1) return 0;
   if (total === 2) return index === 0 ? 180 : 0;
   return -90 + (360 / total) * index;
+}
+
+function bombLevelLabel(bomb) {
+  return `${(bomb.difficulty || "easy").toUpperCase()} ${bomb.sublevel || 1}`;
+}
+
+function bombLevelProgressLabel(bomb) {
+  if (bomb.difficulty === "hard" && bomb.sublevel === 3) return "MAX_LEVEL";
+  const remaining = Math.max(0, Number(bomb.progression?.nextLevelAt || 0) - Number(bomb.round || 0));
+  return `UP_IN_${remaining}_ROUNDS`;
 }
 
 function startBombTimer() {
