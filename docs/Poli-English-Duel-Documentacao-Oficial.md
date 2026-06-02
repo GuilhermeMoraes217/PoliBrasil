@@ -207,6 +207,7 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - Durante o turno, todos os participantes visualizam a palavra sendo completada pelo jogador ativo em tempo real.
 - Uma seta destaca explicitamente o jogador responsável pelo turno.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
+- A arena apresenta os jogadores nas laterais, a bomba com contador no centro e um campo inferior amplo para acomodar palavras longas.
 
 ### Arquitetura híbrida
 

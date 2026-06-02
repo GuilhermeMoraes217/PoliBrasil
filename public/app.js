@@ -490,15 +490,19 @@ function renderBomb() {
   $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
-  $("#bomb-players").innerHTML = players.map((player, index) => `
+  const playerCard = (player, index) => `
     <div class="bomb-player ${player.uid === bomb.turn ? "active" : ""} ${player.hearts <= 0 ? "out" : ""}">
-      <strong class="bomb-turn-arrow">${player.uid === bomb.turn ? "▶" : ""}</strong>
       <span class="bomb-position">${String(index + 1).padStart(2, "0")}</span>
+      <span class="avatar bomb-avatar">${player.photo ? `<img src="${escapeHtml(player.photo)}" alt="">` : "P"}</span>
       <b>${escapeHtml(player.name)}</b>
       <span>${player.score || 0} XP · ${"♥".repeat(player.hearts || 0)}${"♡".repeat(3 - (player.hearts || 0))}</span>
       <em>${player.ready ? "READY" : "WAITING"}</em>
     </div>
-  `).join("");
+  `;
+  $("#bomb-players-left").innerHTML = players.filter((_, index) => index % 2 === 0).map((player) => playerCard(player, players.indexOf(player))).join("");
+  $("#bomb-players-right").innerHTML = players.filter((_, index) => index % 2 === 1).map((player) => playerCard(player, players.indexOf(player))).join("");
+  const activeIndex = players.findIndex((player) => player.uid === bomb.turn);
+  $("#bomb-turn-arrow").className = `bomb-direction-arrow ${activeIndex >= 0 && activeIndex % 2 === 0 ? "to-left" : "to-right"} ${bomb.status !== "playing" ? "hidden" : ""}`;
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
   $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
   $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} completa a palavra ao vivo:`;
@@ -507,6 +511,7 @@ function renderBomb() {
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
   $("#bomb-live-typing").textContent = liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
+  $("#bomb-invite").classList.toggle("hidden", !waiting);
   $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
   const allReady = players.length >= 2 && players.every((player) => player.ready);
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
@@ -614,7 +619,7 @@ async function publishBombTyping() {
   if (!reference || state.bomb?.turn !== state.user?.uid) return;
   await state.firebaseDatabase.set(reference, {
     uid: state.user.uid,
-    value: $("#bomb-input").value.slice(0, 32),
+    value: $("#bomb-input").value.slice(0, 64),
     round: state.bomb.round,
     updatedAt: Date.now()
   });

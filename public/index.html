@@ -191,22 +191,30 @@
           <span id="bomb-meta">ROOM #------ · ENGLISH</span>
         </div>
         <div class="bomb-layout">
-          <section class="dashboard-card bomb-players-panel">
-            <p class="eyebrow">// PLAYERS_LOOP</p>
-            <div id="bomb-players" class="bomb-players"></div>
-          </section>
           <section class="arena-card bomb-arena">
-            <div id="bomb-timer" class="timer"><i id="bomb-timer-bar"></i><b id="bomb-timer-number">10</b></div>
             <p id="bomb-phase" class="eyebrow">// WAITING_FOR_PLAYERS</p>
             <h2 id="bomb-prompt"><span id="bomb-prefix">READY?</span><span id="bomb-live-typing"></span></h2>
             <p id="bomb-live-label" class="prompt-hint">A sílaba fica pronta. Digite somente o restante da palavra.</p>
+            <div class="bomb-turn-stage">
+              <div id="bomb-players-left" class="bomb-players bomb-players-left"></div>
+              <div class="bomb-center">
+                <div id="bomb-core" class="bomb-core">
+                  <span class="bomb-fuse"></span>
+                  <b id="bomb-timer-number">10</b>
+                  <small>SEC</small>
+                </div>
+                <div id="bomb-turn-arrow" class="bomb-direction-arrow">➜</div>
+              </div>
+              <div id="bomb-players-right" class="bomb-players bomb-players-right"></div>
+            </div>
+            <div id="bomb-timer" class="bomb-timer-track"><i id="bomb-timer-bar"></i></div>
             <div id="bomb-invite" class="invite-box">
               <span id="bomb-invite-link">https://.../?bomb=------</span>
               <button id="copy-bomb-invite" class="button secondary compact" type="button">COPIAR LINK</button>
               <a id="bomb-whatsapp-invite" class="button whatsapp compact" target="_blank" rel="noopener">WHATSAPP</a>
             </div>
             <form id="bomb-form">
-              <input id="bomb-input" autocomplete="off" placeholder="aguarde_seu_turno..." maxlength="32">
+              <input id="bomb-input" autocomplete="off" placeholder="aguarde_seu_turno..." maxlength="64">
               <button class="button primary" type="submit">ENVIAR ↵</button>
             </form>
             <p id="bomb-feedback" class="feedback">Marque pronto e aguarde o host iniciar.</p>
