@@ -201,14 +201,20 @@
             <h2 id="bomb-prompt"><span id="bomb-prefix">READY?</span></h2>
             <p id="bomb-live-label" class="prompt-hint">Digite uma palavra que contenha a sílaba exibida.</p>
             <div id="bomb-live-typing" class="bomb-live-word"></div>
+            <div id="bomb-finish-panel" class="bomb-finish-panel hidden">
+              <p class="eyebrow">// MATCH_COMPLETE</p>
+              <h3 id="bomb-finish-title">PLAYER venceu!</h3>
+              <p id="bomb-finish-reason" class="muted">Último jogador com corações.</p>
+              <div id="bomb-finish-scoreboard" class="bomb-finish-scoreboard"></div>
+            </div>
             <div class="bomb-turn-stage">
               <div id="bomb-players" class="bomb-players"></div>
               <div class="bomb-center">
+                <div id="bomb-turn-arrow" class="bomb-direction-arrow"></div>
                 <div id="bomb-core" class="bomb-core">
                   <span class="bomb-fuse"></span>
                   <b id="bomb-timer-number">10</b>
                   <small>SEC</small>
-                  <div id="bomb-turn-arrow" class="bomb-direction-arrow"></div>
                 </div>
               </div>
             </div>

@@ -20,6 +20,8 @@ const state = {
   bombTypingUnsubscribe: null,
   bombTypingValue: "",
   bombTypingByUid: {},
+  lastBombFeedback: null,
+  lastBombFinish: null,
   pollTimer: null,
   rematchPollTimer: null,
   pendingRematch: null,
@@ -189,7 +191,11 @@ async function api(path, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Falha na operação");
+  if (!response.ok) {
+    const error = new Error(payload.error || "Falha na operação");
+    error.payload = payload;
+    throw error;
+  }
   return payload;
 }
 
@@ -462,6 +468,9 @@ async function resumeBomb(code) {
 
 function enterBomb(bomb) {
   state.bomb = bomb;
+  state.lastBombFeedback = null;
+  state.lastBombFinish = null;
+  $("#bomb-finish-panel").classList.add("hidden");
   syncRoomClock(bomb);
   subscribeBombTyping();
   renderBomb();
@@ -494,7 +503,10 @@ function renderBomb() {
   const activePlayer = bomb.players[bomb.turn];
   const me = bomb.players[state.user.uid];
   const waiting = bomb.status === "waiting";
+  const finished = bomb.status === "finished";
   const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
+  $("#bomb-screen").classList.toggle("waiting", waiting);
+  $("#bomb-screen").classList.toggle("finished", finished);
   $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
@@ -560,15 +572,20 @@ function renderBomb() {
 function renderBombFeedback(feedback) {
   const element = $("#bomb-feedback");
   const actor = state.bomb.players[feedback.uid]?.name || "PLAYER";
+  const isNewFeedback = feedback.id !== state.lastBombFeedback;
+  if (isNewFeedback) state.lastBombFeedback = feedback.id;
   if (feedback.kind === "correct") {
     element.textContent = `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
     element.className = "feedback correct";
+    if (isNewFeedback) playSound("correct");
   } else if (feedback.kind === "timeout") {
     element.textContent = `${actor} perdeu um coração: tempo esgotado.`;
     element.className = "feedback timeout";
+    if (isNewFeedback) playSound("explosion");
   } else {
     element.textContent = "Palavra inválida. Corrija antes do tempo acabar.";
     element.className = "feedback wrong";
+    if (isNewFeedback) playSound("wrong");
   }
 }
 
@@ -635,6 +652,10 @@ async function submitBombAnswer(event) {
     syncRoomClock(state.bomb);
     renderBomb();
   } catch (error) {
+    if (error.payload?.bomb) {
+      state.bomb = error.payload.bomb;
+      renderBomb();
+    }
     $("#bomb-feedback").textContent = error.message;
     $("#bomb-feedback").className = "feedback wrong";
     focusInput("#bomb-input");
@@ -679,16 +700,30 @@ async function clearBombTyping() {
 
 function renderBombFinished() {
   const winner = state.bomb.players[state.bomb.winner];
+  const finishKey = `${state.bomb.code}:${state.bomb.winner || "draw"}:${state.bomb.finishReason || "finished"}`;
   $("#bomb-prefix").textContent = "GG";
   $("#bomb-live-typing").textContent = "";
   $("#bomb-input").value = "";
   $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o WORD BOMB!` : "Partida encerrada.";
   $("#bomb-feedback").className = "feedback correct";
+  $("#bomb-finish-panel").classList.remove("hidden");
+  $("#bomb-finish-title").textContent = winner ? `${winner.name} venceu!` : "Partida encerrada";
+  $("#bomb-finish-reason").textContent = winner ? "Último jogador com corações. Vitória registrada no ranking." : "Nenhum jogador permaneceu na arena.";
+  $("#bomb-finish-scoreboard").innerHTML = state.bomb.order.map((uid) => state.bomb.players[uid]).filter(Boolean).map((player) => `
+    <div><b>${escapeHtml(player.name)}</b><em>${player.score || 0} XP · ${player.hearts || 0} ♥</em></div>
+  `).join("");
+  if (finishKey !== state.lastBombFinish) {
+    state.lastBombFinish = finishKey;
+    playSound("victory");
+  }
 }
 
 async function requestBombRematch() {
   try {
     state.bomb = (await api(`/bombs/${state.bomb.code}/rematch`, { method: "POST", body: {} })).bomb;
+    state.lastBombFeedback = null;
+    state.lastBombFinish = null;
+    $("#bomb-finish-panel").classList.add("hidden");
     await clearBombTyping();
     renderBomb();
     toast("Lobby restaurado. Todos precisam marcar pronto novamente.");
@@ -707,6 +742,8 @@ async function leaveBomb() {
   $("#bomb-input").value = "";
   $("#bomb-live-typing").textContent = "";
   $("#bomb-screen").classList.remove("danger");
+  $("#bomb-screen").classList.remove("waiting", "finished");
+  $("#bomb-finish-panel").classList.add("hidden");
   showScreen("home");
   if (bomb) {
     try { await api(`/bombs/${bomb.code}/leave`, { method: "POST", body: {} }); } catch {}
@@ -1149,16 +1186,49 @@ function playSound(kind) {
   if (state.muted) return;
   const context = getAudioContext();
   if (!context) return;
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.frequency.value = kind === "gain" ? 660 : 160;
-  oscillator.type = "square";
-  gain.gain.setValueAtTime(.06, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .16);
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + .16);
+  const note = (frequency, delay, duration, type = "square", volume = .055) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const start = context.currentTime + delay;
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+    gain.gain.setValueAtTime(volume, start);
+    gain.gain.exponentialRampToValueAtTime(.001, start + duration);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(start + duration);
+  };
+  if (kind === "explosion") {
+    const duration = .48;
+    const buffer = context.createBuffer(1, context.sampleRate * duration, context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < data.length; index += 1) data[index] = (Math.random() * 2 - 1) * (1 - index / data.length);
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(.18, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + duration);
+    source.connect(gain);
+    gain.connect(context.destination);
+    source.start();
+    note(92, 0, .4, "sawtooth", .09);
+    return;
+  }
+  if (kind === "correct" || kind === "gain") {
+    note(523.25, 0, .12);
+    note(659.25, .08, .14);
+    note(783.99, .16, .18);
+    return;
+  }
+  if (kind === "victory") {
+    note(523.25, 0, .35, "triangle", .07);
+    note(659.25, .1, .38, "triangle", .07);
+    note(783.99, .2, .5, "triangle", .08);
+    return;
+  }
+  note(180, 0, .18, "sawtooth", .07);
+  note(120, .08, .22, "square", .055);
 }
 
 function toast(message) {

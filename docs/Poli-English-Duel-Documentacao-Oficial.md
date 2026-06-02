@@ -211,10 +211,12 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - O último jogador com corações vence.
 - Durante o turno, todos os participantes visualizam a palavra completa sendo digitada pelo jogador ativo em tempo real.
 - Os jogadores são distribuídos simetricamente ao redor da bomba. Uma seta sai do centro e aponta diretamente para o participante responsável pelo turno.
+- A seta usa uma trilha segmentada luminosa atrás da bomba e dos cards, preservando a leitura visual da arena.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
 - A arena apresenta os jogadores ao redor da bomba, o contador no centro e um campo inferior amplo para acomodar palavras longas.
 - Um convite por link leva o usuário autenticado diretamente ao lobby configurado pelo host, sem reabrir o seletor de idioma.
 - Ao final, qualquer participante pode restaurar o lobby pelo botão de revanche. Placares, corações, confirmações de pronto e progressão são reiniciados em `EASY 1`.
+- Ao encerrar, a arena troca o tabuleiro por um painel final com vencedor e placar completo.
 
 ### Arquitetura híbrida
 
@@ -263,6 +265,8 @@ Dados demonstrativos não entram no ranking nem no histórico.
 O jogo possui efeitos sonoros opcionais gerados no navegador. O estado de áudio é salvo localmente no browser por meio de `localStorage`.
 
 O usuário também pode selecionar trilhas instrumentais leves `lounge_01()` e `lounge_02()` ou manter `music_off()`. As melodias são sintetizadas no navegador, sem arquivos de áudio adicionais, e a preferência também é persistida localmente.
+
+O `Word Bomb` sintetiza efeitos próprios para resposta correta, resposta inválida, explosão por timeout e vitória. Cada evento é reproduzido uma única vez, mesmo com a atualização periódica do estado multiplayer.
 
 ## 5.6 Revanche
 
