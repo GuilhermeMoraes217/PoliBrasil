@@ -212,7 +212,7 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - O último jogador com corações vence.
 - Durante o turno, todos os participantes visualizam a palavra completa sendo digitada pelo jogador ativo em tempo real.
 - Os jogadores são distribuídos simetricamente ao redor da bomba. Uma seta sai do centro e aponta diretamente para o participante responsável pelo turno.
-- Durante a rodada ativa, os cards ficam afastados do cronômetro para preservar uma área central legível.
+- Durante a rodada ativa, os cards ficam afastados do cronômetro por um raio responsivo e permanecem dentro do painel para preservar uma área central legível.
 - A seta usa uma trilha segmentada luminosa atrás da bomba e dos cards, preservando a leitura visual da arena.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
 - A arena apresenta os jogadores ao redor da bomba, o contador no centro e um campo inferior amplo para acomodar palavras longas.

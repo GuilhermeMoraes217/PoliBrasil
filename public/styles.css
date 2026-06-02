@@ -170,13 +170,13 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .context-open-rooms { margin-top: 18px; }.context-open-rooms p { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
 .context-room { align-items: center; background: #07110d; border: 1px solid var(--line); color: var(--cream); display: grid; font-size: 10px; gap: 8px; grid-template-columns: 1fr auto; margin-top: 8px; padding: 11px; text-align: left; width: 100%; }
 .context-room b { color: var(--green); }.context-room span { color: var(--muted); }
-.bomb-layout { margin: 16px auto 0; max-width: 1060px; }
+.bomb-layout { margin: 16px auto 0; max-width: 1180px; }
 #bomb-screen { margin-bottom: -42px; margin-top: -34px; }
-.bomb-arena { min-height: 0; padding: 20px 28px 18px; text-align: center; }.bomb-arena h2 { color: #67e8f9; text-transform: uppercase; }
+.bomb-arena { max-width: 1180px; min-height: 0; padding: 20px 28px 18px; text-align: center; }.bomb-arena h2 { color: #67e8f9; text-transform: uppercase; }
 #bomb-prefix { color: #67e8f9; } #bomb-live-typing { color: var(--green-bright); }
 .bomb-live-word { color: var(--green-bright); font-family: "Press Start 2P"; font-size: 15px; min-height: 22px; overflow-wrap: anywhere; }
 .bomb-arena h2 { font-size: clamp(32px, 5vw, 58px); margin: 12px 0; min-height: 66px; overflow-wrap: anywhere; }
-.bomb-turn-stage { margin: 12px 0; min-height: 280px; position: relative; }
+.bomb-turn-stage { margin: 12px 0; min-height: 360px; position: relative; }
 .bomb-players { inset: 0; position: absolute; z-index: 3; }
 .bomb-player-slot { left: calc(50% + var(--player-x)); position: absolute; top: calc(50% + var(--player-y)); transform: translate(-50%,-50%); width: 245px; }
 .bomb-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 7px 9px; grid-template-columns: 22px 44px 1fr; padding: 11px; text-align: left; }

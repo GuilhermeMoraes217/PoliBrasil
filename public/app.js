@@ -530,24 +530,26 @@ function renderBomb() {
       </div>
     `).join("")}</div>
   ` : "";
+  const turnStage = $(".bomb-turn-stage");
+  const compactArena = turnStage.clientWidth < 600;
+  const orbitX = compactArena ? 30 : 36;
+  const orbitY = compactArena ? 34 : 36;
   $("#bomb-players").innerHTML = players.map((player, index) => {
     const angle = playerAngle(index, players.length);
     const radians = angle * Math.PI / 180;
-    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * 45}%;--player-y:${Math.sin(radians) * 42}%">${playerCard(player, index)}</div>`;
+    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * orbitX}%;--player-y:${Math.sin(radians) * orbitY}%">${playerCard(player, index)}</div>`;
   }).join("");
   const activeIndex = players.findIndex((player) => player.uid === bomb.turn);
   const activeAngle = playerAngle(activeIndex, players.length);
   const activeRadians = activeAngle * Math.PI / 180;
-  const turnStage = $(".bomb-turn-stage");
-  const compactArena = turnStage.clientWidth < 600;
   const cardInset = (
     Math.abs(Math.cos(activeRadians)) * (compactArena ? 56 : 122)
     + Math.abs(Math.sin(activeRadians)) * (compactArena ? 32 : 42)
   );
   const arrowLength = (
     Math.hypot(
-      Math.cos(activeRadians) * turnStage.clientWidth * .45,
-      Math.sin(activeRadians) * turnStage.clientHeight * .42
+      Math.cos(activeRadians) * turnStage.clientWidth * orbitX / 100,
+      Math.sin(activeRadians) * turnStage.clientHeight * orbitY / 100
     )
     - cardInset
   );
