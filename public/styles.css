@@ -176,7 +176,7 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 #bomb-prefix { color: #67e8f9; } #bomb-live-typing { color: var(--green-bright); }
 .bomb-live-word { color: var(--green-bright); font-family: "Press Start 2P"; font-size: 15px; min-height: 22px; overflow-wrap: anywhere; }
 .bomb-arena h2 { font-size: clamp(32px, 5vw, 58px); margin: 12px 0; min-height: 66px; overflow-wrap: anywhere; }
-.bomb-turn-stage { margin: 12px 0; min-height: 320px; position: relative; }
+.bomb-turn-stage { margin: 12px auto; max-width: 1560px; min-height: 320px; position: relative; width: 100%; }
 .bomb-players { inset: 0; position: absolute; z-index: 3; }
 .bomb-player-slot { left: calc(50% + var(--player-x)); position: absolute; top: calc(50% + var(--player-y)); transform: translate(-50%,-50%); width: 245px; }
 .bomb-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 7px 9px; grid-template-columns: 22px 44px 1fr; padding: 11px; text-align: left; }
