@@ -34,6 +34,10 @@ const state = {
   lastFeedback: null,
   serverOffset: 0,
   muted: localStorage.getItem("poli-muted") === "true",
+  musicTrack: localStorage.getItem("poli-music-track") || "off",
+  musicTimer: null,
+  audioContext: null,
+  musicStep: 0,
   apiToken: null,
   demo: !config.apiKey || new URLSearchParams(location.search).has("demo")
 };
@@ -75,6 +79,7 @@ function bindInterface() {
   $("#room-code").addEventListener("click", copyCode);
   $("#copy-invite").addEventListener("click", copyInvite);
   $("#mute-button").addEventListener("click", toggleMute);
+  $("#music-track").addEventListener("change", changeMusicTrack);
   $("#rematch-button").addEventListener("click", requestRematch);
   $("#accept-rematch").addEventListener("click", acceptRematch);
   $("#decline-rematch").addEventListener("click", declineRematch);
@@ -93,8 +98,10 @@ function bindInterface() {
   $("#bomb-form").addEventListener("submit", submitBombAnswer);
   $("#bomb-input").addEventListener("input", publishBombTyping);
   $("#copy-bomb-invite").addEventListener("click", copyBombInvite);
+  document.addEventListener("pointerdown", startMusic, { once: true });
   window.addEventListener("beforeunload", notifyLeaveOnUnload);
   renderMute();
+  $("#music-track").value = state.musicTrack;
 }
 
 async function connectFirebase() {
@@ -499,15 +506,35 @@ function renderBomb() {
       <em>${player.ready ? "READY" : "WAITING"}</em>
     </div>
   `;
-  $("#bomb-players-left").innerHTML = players.filter((_, index) => index % 2 === 0).map((player) => playerCard(player, players.indexOf(player))).join("");
-  $("#bomb-players-right").innerHTML = players.filter((_, index) => index % 2 === 1).map((player) => playerCard(player, players.indexOf(player))).join("");
+  $("#bomb-players").innerHTML = players.map((player, index) => {
+    const angle = playerAngle(index, players.length);
+    const radians = angle * Math.PI / 180;
+    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * 38}%;--player-y:${Math.sin(radians) * 38}%">${playerCard(player, index)}</div>`;
+  }).join("");
   const activeIndex = players.findIndex((player) => player.uid === bomb.turn);
-  $("#bomb-turn-arrow").className = `bomb-direction-arrow ${activeIndex >= 0 && activeIndex % 2 === 0 ? "to-left" : "to-right"} ${bomb.status !== "playing" ? "hidden" : ""}`;
+  const activeAngle = playerAngle(activeIndex, players.length);
+  const activeRadians = activeAngle * Math.PI / 180;
+  const turnStage = $(".bomb-turn-stage");
+  const compactArena = turnStage.clientWidth < 600;
+  const cardInset = (
+    Math.abs(Math.cos(activeRadians)) * (compactArena ? 56 : 122)
+    + Math.abs(Math.sin(activeRadians)) * (compactArena ? 32 : 42)
+  );
+  const arrowLength = (
+    Math.hypot(
+      Math.cos(activeRadians) * turnStage.clientWidth * .38,
+      Math.sin(activeRadians) * turnStage.clientHeight * .38
+    )
+    - cardInset
+  );
+  $("#bomb-turn-arrow").style.width = `${Math.max(54, arrowLength)}px`;
+  $("#bomb-turn-arrow").style.transform = `rotate(${activeAngle}deg)`;
+  $("#bomb-turn-arrow").classList.toggle("hidden", bomb.status !== "playing");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
   $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
-  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} completa a palavra ao vivo:`;
+  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} digita uma palavra ao vivo:`;
   $("#bomb-input").disabled = !canAnswer;
-  $("#bomb-input").placeholder = canAnswer ? "digite_apenas_o_restante..." : "aguarde_seu_turno...";
+  $("#bomb-input").placeholder = canAnswer ? "digite_a_palavra_completa..." : "aguarde_seu_turno...";
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
   $("#bomb-live-typing").textContent = bomb.status === "playing" && liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
@@ -541,6 +568,12 @@ function renderBombFeedback(feedback) {
     element.textContent = "Palavra inválida. Corrija antes do tempo acabar.";
     element.className = "feedback wrong";
   }
+}
+
+function playerAngle(index, total) {
+  if (index < 0 || total < 1) return 0;
+  if (total === 2) return index === 0 ? 180 : 0;
+  return -90 + (360 / total) * index;
 }
 
 function startBombTimer() {
@@ -1031,18 +1064,67 @@ function toggleMute() {
   state.muted = !state.muted;
   localStorage.setItem("poli-muted", state.muted);
   renderMute();
-  if (!state.muted) playSound("gain");
+  if (state.muted) stopMusic();
+  else {
+    playSound("gain");
+    startMusic();
+  }
 }
 
 function renderMute() {
   $("#mute-button").textContent = state.muted ? "mute()" : "sound_on()";
 }
 
+function changeMusicTrack(event) {
+  state.musicTrack = event.target.value;
+  localStorage.setItem("poli-music-track", state.musicTrack);
+  stopMusic();
+  startMusic();
+}
+
+function getAudioContext() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  if (!state.audioContext) state.audioContext = new AudioContext();
+  if (state.audioContext.state === "suspended") state.audioContext.resume();
+  return state.audioContext;
+}
+
+function startMusic() {
+  if (state.muted || state.musicTrack === "off" || state.musicTimer) return;
+  const melodies = {
+    lounge_01: [261.63, 329.63, 392, 493.88, 392, 329.63, 293.66, 349.23],
+    lounge_02: [220, 277.18, 329.63, 415.3, 369.99, 329.63, 246.94, 293.66]
+  };
+  const playNote = () => {
+    const notes = melodies[state.musicTrack];
+    const context = getAudioContext();
+    if (!notes || !context) return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = notes[state.musicStep++ % notes.length];
+    oscillator.type = "sine";
+    gain.gain.setValueAtTime(.025, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .62);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + .64);
+  };
+  playNote();
+  state.musicTimer = setInterval(playNote, 720);
+}
+
+function stopMusic() {
+  clearInterval(state.musicTimer);
+  state.musicTimer = null;
+  state.musicStep = 0;
+}
+
 function playSound(kind) {
   if (state.muted) return;
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
-  const context = new AudioContext();
+  const context = getAudioContext();
+  if (!context) return;
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.frequency.value = kind === "gain" ? 660 : 160;

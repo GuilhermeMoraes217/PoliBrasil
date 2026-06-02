@@ -197,17 +197,17 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - Uma sala aceita até oito participantes.
 - Cada jogador marca seu estado como pronto no lobby.
 - A partida não começa automaticamente: somente o host pode iniciá-la, e o botão fica disponível quando todos estiverem prontos.
-- O backend apresenta um prefixo obrigatório de duas letras e alterna os turnos entre os jogadores ativos.
-- O prefixo permanece fixo na tela. O participante digita somente o complemento: para `PA`, escreve `RADA` e envia `PARADA`.
-- A palavra montada deve existir no dicionário, começar com o prefixo apresentado e ainda não ter sido utilizada na partida.
+- O backend apresenta uma sílaba obrigatória de duas letras e alterna os turnos entre os jogadores ativos.
+- O participante digita a palavra completa.
+- A palavra deve existir no dicionário, conter a sílaba exibida em qualquer posição e ainda não ter sido utilizada na partida. Exemplo: a sílaba `OO` aceita `BOOK`.
 - Uma resposta válida concede `100 XP` e passa o turno.
 - Uma resposta inválida pode ser corrigida enquanto ainda houver tempo.
 - Quando o cronômetro de dez segundos termina, o jogador perde um coração e o turno avança.
 - O último jogador com corações vence.
-- Durante o turno, todos os participantes visualizam a palavra sendo completada pelo jogador ativo em tempo real.
-- Uma seta destaca explicitamente o jogador responsável pelo turno.
+- Durante o turno, todos os participantes visualizam a palavra completa sendo digitada pelo jogador ativo em tempo real.
+- Os jogadores são distribuídos simetricamente ao redor da bomba. Uma seta sai do centro e aponta diretamente para o participante responsável pelo turno.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
-- A arena apresenta os jogadores nas laterais, a bomba com contador no centro e um campo inferior amplo para acomodar palavras longas.
+- A arena apresenta os jogadores ao redor da bomba, o contador no centro e um campo inferior amplo para acomodar palavras longas.
 
 ### Arquitetura híbrida
 
@@ -254,6 +254,8 @@ Dados demonstrativos não entram no ranking nem no histórico.
 ## 5.5 Áudio
 
 O jogo possui efeitos sonoros opcionais gerados no navegador. O estado de áudio é salvo localmente no browser por meio de `localStorage`.
+
+O usuário também pode selecionar trilhas instrumentais leves `lounge_01()` e `lounge_02()` ou manter `music_off()`. As melodias são sintetizadas no navegador, sem arquivos de áudio adicionais, e a preferência também é persistida localmente.
 
 ## 5.6 Revanche
 

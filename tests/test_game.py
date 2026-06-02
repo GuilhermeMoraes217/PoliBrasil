@@ -223,21 +223,21 @@ class GameEngineTest(unittest.TestCase):
             "usedWords": {}, "usedPrompts": ["bo"],
         }
         with closing(server.connect_db()) as database, database:
-            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "ok")
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "book")
         self.assertTrue(accepted)
         self.assertEqual(bomb["players"]["one"]["score"], 100)
         self.assertEqual(bomb["turn"], "two")
 
-    def test_word_bomb_rejects_retyping_fixed_prefix(self):
+    def test_word_bomb_accepts_prompt_in_the_middle_of_word(self):
         bomb = {
-            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "bo",
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
             "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
-            "usedWords": {}, "usedPrompts": ["bo"],
+            "usedWords": {}, "usedPrompts": ["oo"],
         }
         with closing(server.connect_db()) as database, database:
             bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "book")
-        self.assertFalse(accepted)
-        self.assertEqual(bomb["turn"], "one")
+        self.assertTrue(accepted)
+        self.assertEqual(bomb["turn"], "two")
 
     def test_word_bomb_invalid_word_keeps_turn_until_timeout(self):
         bomb = {

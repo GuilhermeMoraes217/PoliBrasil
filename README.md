@@ -63,13 +63,14 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
 - Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
-- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, prefixo fixo e complemento digitado ao vivo via Firebase Realtime Database.
+- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, sílaba em qualquer parte da palavra e digitação ao vivo via Firebase Realtime Database.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
 - Convites por link, revanche, abandono de partida, ranking e histórico.
 - Validação autoritativa de respostas no backend Python.
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
+- Trilhas lounge opcionais geradas no navegador, sem arquivos de áudio pesados.
 
 No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode criar uma sala, retomar uma sala aberta ou entrar em uma existente, digitar uma palavra em português para receber uma sugestão inglesa e competir por XP com outras pessoas. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta. Ao chegar em `0`, o jogador recebe bônus e vence a sala.
 
