@@ -519,10 +519,21 @@ function renderBomb() {
       <em>${player.ready ? "READY" : "WAITING"}</em>
     </div>
   `;
+  $("#bomb-lobby-players").classList.toggle("hidden", !waiting);
+  $("#bomb-lobby-players").innerHTML = waiting ? `
+    <p>// PLAYERS_IN_ROOM</p>
+    <div class="bomb-lobby-list">${players.map((player, index) => `
+      <div class="bomb-lobby-player">
+        <span class="avatar bomb-lobby-avatar">${player.photo ? `<img src="${escapeHtml(player.photo)}" alt="">` : "P"}</span>
+        <b>${String(index + 1).padStart(2, "0")} · ${escapeHtml(player.name)}</b>
+        <em>${player.ready ? "READY" : "WAITING"}</em>
+      </div>
+    `).join("")}</div>
+  ` : "";
   $("#bomb-players").innerHTML = players.map((player, index) => {
     const angle = playerAngle(index, players.length);
     const radians = angle * Math.PI / 180;
-    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * 38}%;--player-y:${Math.sin(radians) * 38}%">${playerCard(player, index)}</div>`;
+    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * 45}%;--player-y:${Math.sin(radians) * 42}%">${playerCard(player, index)}</div>`;
   }).join("");
   const activeIndex = players.findIndex((player) => player.uid === bomb.turn);
   const activeAngle = playerAngle(activeIndex, players.length);
@@ -535,8 +546,8 @@ function renderBomb() {
   );
   const arrowLength = (
     Math.hypot(
-      Math.cos(activeRadians) * turnStage.clientWidth * .38,
-      Math.sin(activeRadians) * turnStage.clientHeight * .38
+      Math.cos(activeRadians) * turnStage.clientWidth * .45,
+      Math.sin(activeRadians) * turnStage.clientHeight * .42
     )
     - cardInset
   );

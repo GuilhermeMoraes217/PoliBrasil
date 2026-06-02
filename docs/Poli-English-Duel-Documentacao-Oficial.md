@@ -200,6 +200,7 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - O cabeçalho da arena exibe o subnível atual e quantas rodadas faltam para o próximo avanço.
 - Os níveis iniciais usam pares cotidianos como `CA`, `BA` e `TA`; os intermediários usam combinações frequentes; os avançados liberam trechos internos e encontros consonantais como `ST`.
 - Cada jogador marca seu estado como pronto no lobby.
+- O lobby exibe uma lista compacta com foto, nome e estado dos participantes. A bomba e o cronômetro permanecem ocultos até o início da partida.
 - A partida não começa automaticamente: somente o host pode iniciá-la, e o botão fica disponível quando todos estiverem prontos.
 - O backend apresenta uma sílaba obrigatória de duas letras e alterna os turnos entre os jogadores ativos.
 - O participante digita a palavra completa.
@@ -211,6 +212,7 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - O último jogador com corações vence.
 - Durante o turno, todos os participantes visualizam a palavra completa sendo digitada pelo jogador ativo em tempo real.
 - Os jogadores são distribuídos simetricamente ao redor da bomba. Uma seta sai do centro e aponta diretamente para o participante responsável pelo turno.
+- Durante a rodada ativa, os cards ficam afastados do cronômetro para preservar uma área central legível.
 - A seta usa uma trilha segmentada luminosa atrás da bomba e dos cards, preservando a leitura visual da arena.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
 - A arena apresenta os jogadores ao redor da bomba, o contador no centro e um campo inferior amplo para acomodar palavras longas.
