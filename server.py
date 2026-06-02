@@ -27,6 +27,11 @@ FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
 BOMB_MAX_PLAYERS = 8
+BOMB_DIFFICULTIES = {"easy", "medium", "hard"}
+EASY_BOMB_PROMPTS = {
+    "en": {"ba", "bo", "ca", "co", "da", "fa", "ga", "ha", "la", "ma", "na", "pa", "ra", "sa", "ta", "wa"},
+    "pt": {"ba", "ca", "co", "da", "de", "do", "fa", "ga", "la", "ma", "na", "pa", "ra", "sa", "ta", "va"},
+}
 LOCK = threading.RLock()
 TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
@@ -345,17 +350,44 @@ def bomb_dictionary(language: str) -> set[str]:
     }
 
 
-def build_bomb_prompts(language: str) -> list[str]:
-    frequency: dict[str, int] = {}
+def build_bomb_prompts(language: str, difficulty: str) -> list[str]:
+    frequency: dict[str, dict[str, int]] = {}
     for word in bomb_dictionary(language):
         for index in range(len(word) - 1):
             prompt = word[index:index + 2]
-            frequency[prompt] = frequency.get(prompt, 0) + 1
-    return [prompt for prompt, count in frequency.items() if count >= 12]
+            stats = frequency.setdefault(prompt, {"total": 0, "prefix": 0, "internal": 0})
+            stats["total"] += 1
+            stats["prefix" if index == 0 else "internal"] += 1
+    easy = {
+        prompt for prompt in EASY_BOMB_PROMPTS[language]
+        if frequency.get(prompt, {}).get("total", 0) >= 12
+    }
+    medium = {
+        prompt for prompt, stats in frequency.items()
+        if stats["prefix"] >= 12
+        and any(letter in "aeiou" for letter in prompt)
+        and prompt[0] != prompt[1]
+        and prompt not in easy
+    }
+    hard = {
+        prompt for prompt, stats in frequency.items()
+        if stats["internal"] >= 18
+        and prompt[0] != prompt[1]
+        and prompt not in easy
+        and prompt not in medium
+    }
+    pools = {"easy": easy, "medium": medium, "hard": hard}
+    return sorted(pools[difficulty] or medium or easy)
 
 
 BOMB_WORDS = {language: bomb_dictionary(language) for language in ("en", "pt")}
-BOMB_PROMPTS = {language: build_bomb_prompts(language) for language in ("en", "pt")}
+BOMB_PROMPTS = {
+    language: {
+        difficulty: build_bomb_prompts(language, difficulty)
+        for difficulty in BOMB_DIFFICULTIES
+    }
+    for language in ("en", "pt")
+}
 
 
 def remote_bomb_words(language: str, prefix: str) -> set[str]:
@@ -429,7 +461,7 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
     current = bomb.get("turn")
     current_index = alive.index(current) if current in alive else -1
     bomb["turn"] = alive[(current_index + 1) % len(alive)]
-    prompts = BOMB_PROMPTS[bomb["language"]]
+    prompts = BOMB_PROMPTS[bomb["language"]][bomb.get("difficulty", "easy")]
     available = [prompt for prompt in prompts if prompt not in bomb.setdefault("usedPrompts", [])]
     if not available:
         bomb["usedPrompts"] = []
@@ -565,7 +597,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.create_context(user, payload)
         if path == "/api/bombs":
             return self.create_bomb(user, payload)
-        bomb_match = re.fullmatch(r"/api/bombs/([A-Z0-9]{6})/(join|ready|start|answer|leave)", path)
+        bomb_match = re.fullmatch(r"/api/bombs/([A-Z0-9]{6})/(join|ready|start|answer|leave|rematch)", path)
         if bomb_match:
             code, action = bomb_match.groups()
             return getattr(self, f"{action}_bomb")(code, user, payload)
@@ -581,8 +613,9 @@ class PoliHandler(SimpleHTTPRequestHandler):
 
     def create_bomb(self, user: dict, payload: dict):
         language = payload.get("language", "en")
-        if language not in {"en", "pt"}:
-            return self.send_json({"error": "Idioma invalido"}, status=400)
+        difficulty = payload.get("difficulty", "easy")
+        if language not in {"en", "pt"} or difficulty not in BOMB_DIFFICULTIES:
+            return self.send_json({"error": "Idioma ou dificuldade invalidos"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             code = random_code()
             while read_bomb(database, code):
@@ -590,7 +623,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             player = self.player_from_user(user)
             player["ready"] = False
             bomb = {
-                "code": code, "owner": user["uid"], "language": language, "status": "waiting",
+                "code": code, "owner": user["uid"], "language": language, "difficulty": difficulty, "status": "waiting",
                 "createdAt": now_ms(), "round": 0, "players": {user["uid"]: player}, "order": [user["uid"]],
                 "usedWords": {}, "usedPrompts": [],
             }
@@ -690,6 +723,24 @@ class PoliHandler(SimpleHTTPRequestHandler):
             write_bomb(database, bomb)
         return self.send_json({"ok": True})
 
+    def rematch_bomb(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            if bomb["status"] != "finished":
+                return self.send_json({"error": "A revanche so pode ser solicitada apos a partida"}, status=409)
+            bomb.update({
+                "status": "waiting", "round": 0, "usedWords": {}, "usedPrompts": [],
+                "winner": None, "finishReason": None, "lastFeedback": None, "deadline": now_ms(),
+            })
+            bomb.pop("rankingRecorded", None)
+            for player in bomb["players"].values():
+                player.update({"hearts": 3, "score": 0, "ready": False})
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
     def get_open_bombs(self, uid: str):
         with closing(connect_db()) as database, database:
             rows = database.execute("SELECT payload FROM bombs ORDER BY updated_at DESC").fetchall()
@@ -698,7 +749,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             bomb = json.loads(row["payload"])
             if bomb.get("status") in {"waiting", "playing"} and uid in bomb.get("players", {}):
                 bombs.append({
-                    "code": bomb["code"], "language": bomb["language"], "status": bomb["status"],
+                    "code": bomb["code"], "language": bomb["language"], "difficulty": bomb.get("difficulty", "easy"), "status": bomb["status"],
                     "players": len(bomb["players"]), "createdAt": bomb["createdAt"],
                 })
         return bombs[:10]

@@ -63,7 +63,7 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
 - Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
-- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, sílaba em qualquer parte da palavra e digitação ao vivo via Firebase Realtime Database.
+- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, sílaba em qualquer parte da palavra, níveis pedagógicos e digitação ao vivo via Firebase Realtime Database.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
@@ -71,6 +71,8 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Validação autoritativa de respostas no backend Python.
 - Feedback visual e sonoro opcional, timer numérico e convite via WhatsApp.
 - Trilhas lounge opcionais geradas no navegador, sem arquivos de áudio pesados.
+
+No `Word Bomb`, o host escolhe idioma e dificuldade. O nível `easy` usa sílabas cotidianas como `CA`, `BA` e `TA`; `medium` amplia combinações frequentes; `hard` inclui trechos internos e encontros consonantais. Convites levam usuários autenticados diretamente ao lobby. Respostas em português aceitam a grafia com ou sem acento, e o botão de revanche restaura o lobby para uma nova confirmação de pronto.
 
 No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode criar uma sala, retomar uma sala aberta ou entrar em uma existente, digitar uma palavra em português para receber uma sugestão inglesa e competir por XP com outras pessoas. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta. Ao chegar em `0`, o jogador recebe bônus e vence a sala.
 

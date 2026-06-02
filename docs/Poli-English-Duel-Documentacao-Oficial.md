@@ -193,13 +193,15 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 
 ### Regras
 
-- O host escolhe o idioma ao criar a sala.
 - Uma sala aceita até oito participantes.
+- O host escolhe o idioma e o nível pedagógico das sílabas antes de criar a sala.
+- O nível `easy` usa pares cotidianos como `CA`, `BA` e `TA`; `medium` usa combinações frequentes; `hard` libera trechos internos e encontros consonantais como `ST`.
 - Cada jogador marca seu estado como pronto no lobby.
 - A partida não começa automaticamente: somente o host pode iniciá-la, e o botão fica disponível quando todos estiverem prontos.
 - O backend apresenta uma sílaba obrigatória de duas letras e alterna os turnos entre os jogadores ativos.
 - O participante digita a palavra completa.
 - A palavra deve existir no dicionário, conter a sílaba exibida em qualquer posição e ainda não ter sido utilizada na partida. Exemplo: a sílaba `OO` aceita `BOOK`.
+- Em português, a normalização ignora acentos: `maçã` e `maca` são aceitas como a mesma palavra.
 - Uma resposta válida concede `100 XP` e passa o turno.
 - Uma resposta inválida pode ser corrigida enquanto ainda houver tempo.
 - Quando o cronômetro de dez segundos termina, o jogador perde um coração e o turno avança.
@@ -208,6 +210,8 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 - Os jogadores são distribuídos simetricamente ao redor da bomba. Uma seta sai do centro e aponta diretamente para o participante responsável pelo turno.
 - Nos três segundos finais, a arena, o contador e a barra recebem um alerta visual vermelho pulsante.
 - A arena apresenta os jogadores ao redor da bomba, o contador no centro e um campo inferior amplo para acomodar palavras longas.
+- Um convite por link leva o usuário autenticado diretamente ao lobby configurado pelo host, sem reabrir o seletor de idioma.
+- Ao final, qualquer participante pode restaurar o lobby pelo botão de revanche. Placares, corações e confirmações de pronto são reiniciados.
 
 ### Arquitetura híbrida
 
@@ -520,7 +524,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 
 | Método | Endpoint | Finalidade |
 | --- | --- | --- |
-| `POST` | `/api/bombs` | Criar sala e escolher idioma |
+| `POST` | `/api/bombs` | Criar sala e escolher idioma e nível |
 | `GET` | `/api/bombs` | Listar salas abertas do usuário |
 | `GET` | `/api/bombs/<code>` | Consultar lobby ou partida |
 | `POST` | `/api/bombs/<code>/join` | Entrar na sala |
@@ -528,6 +532,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 | `POST` | `/api/bombs/<code>/start` | Iniciar partida como host |
 | `POST` | `/api/bombs/<code>/answer` | Enviar palavra do turno |
 | `POST` | `/api/bombs/<code>/leave` | Sair da sala |
+| `POST` | `/api/bombs/<code>/rematch` | Restaurar lobby para uma revanche |
 
 # 10. Estrutura do repositório
 

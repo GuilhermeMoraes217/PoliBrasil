@@ -103,7 +103,7 @@ class WsgiAppTest(unittest.TestCase):
     def test_word_bomb_host_can_start_only_after_everyone_is_ready(self):
         with patch.object(server, "ALLOW_DEMO", True):
             created = self.client.post(
-                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "en"}
+                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "en", "difficulty": "hard"}
             )
             code = created.json["bomb"]["code"]
             joined = self.client.post(
@@ -122,12 +122,35 @@ class WsgiAppTest(unittest.TestCase):
                 f"/api/bombs/{code}/start", headers={"Authorization": "Bearer demo-one"}, json={}
             )
         self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json["bomb"]["difficulty"], "hard")
         self.assertEqual(joined.status_code, 200)
         self.assertEqual(blocked.status_code, 409)
         self.assertEqual(started.status_code, 200)
         self.assertEqual(started.json["bomb"]["status"], "playing")
         self.assertIn(started.json["bomb"]["turn"], {"demo-one", "demo-two"})
         self.assertIn("serverNow", started.json["bomb"])
+
+    def test_word_bomb_rematch_returns_everyone_to_lobby(self):
+        bomb = {
+            "code": "BOMB02", "owner": "demo-one", "language": "pt", "difficulty": "easy", "status": "finished",
+            "round": 5, "winner": "demo-one", "finishReason": "last_player", "rankingRecorded": True,
+            "players": {
+                "demo-one": {"uid": "demo-one", "name": "PLAYER_ONE", "photo": "", "hearts": 2, "score": 300, "ready": True},
+                "demo-two": {"uid": "demo-two", "name": "PLAYER_TWO", "photo": "", "hearts": 0, "score": 100, "ready": True},
+            },
+            "order": ["demo-one", "demo-two"], "usedWords": {"maca": True}, "usedPrompts": ["ac"],
+        }
+        with server.closing(server.connect_db()) as database, database:
+            server.write_bomb(database, bomb)
+        with patch.object(server, "ALLOW_DEMO", True):
+            response = self.client.post(
+                "/api/bombs/BOMB02/rematch", headers={"Authorization": "Bearer demo-two"}, json={}
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["bomb"]["status"], "waiting")
+        self.assertEqual(response.json["bomb"]["round"], 0)
+        self.assertTrue(all(player["hearts"] == 3 for player in response.json["bomb"]["players"].values()))
+        self.assertTrue(all(not player["ready"] for player in response.json["bomb"]["players"].values()))
 
 
 if __name__ == "__main__":

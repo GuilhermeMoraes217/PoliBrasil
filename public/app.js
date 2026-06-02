@@ -94,6 +94,7 @@ function bindInterface() {
   $("#join-bomb").addEventListener("click", joinBomb);
   $("#bomb-ready").addEventListener("click", toggleBombReady);
   $("#bomb-start").addEventListener("click", startBombMatch);
+  $("#bomb-rematch").addEventListener("click", requestBombRematch);
   $("#leave-bomb").addEventListener("click", leaveBomb);
   $("#bomb-form").addEventListener("submit", submitBombAnswer);
   $("#bomb-input").addEventListener("input", publishBombTyping);
@@ -412,7 +413,7 @@ async function loadOpenBombs() {
       ${bombs.map((bomb) => `
         <button class="context-room" type="button" data-bomb-code="${bomb.code}">
           <b>#${bomb.code}</b>
-          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bomb.status.toUpperCase()}</span>
+          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bomb.difficulty.toUpperCase()} · ${bomb.status.toUpperCase()}</span>
         </button>
       `).join("")}
     ` : "";
@@ -424,7 +425,10 @@ async function loadOpenBombs() {
 
 async function createBomb() {
   try {
-    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value } });
+    const { bomb } = await api("/bombs", {
+      method: "POST",
+      body: { language: $("#bomb-language").value, difficulty: $("#bomb-difficulty").value }
+    });
     $("#bomb-modal").close();
     enterBomb(bomb);
   } catch (error) {
@@ -494,7 +498,7 @@ function renderBomb() {
   const me = bomb.players[state.user.uid];
   const waiting = bomb.status === "waiting";
   const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
-  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"}`;
+  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${(bomb.difficulty || "easy").toUpperCase()}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
   const playerCard = (player, index) => `
@@ -543,6 +547,7 @@ function renderBomb() {
   const allReady = players.length >= 2 && players.every((player) => player.ready);
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
   $("#bomb-start").disabled = !allReady;
+  $("#bomb-rematch").classList.toggle("hidden", bomb.status !== "finished");
   if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host já pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
   if (bomb.lastFeedback) renderBombFeedback(bomb.lastFeedback);
   if (bomb.status === "playing") {
@@ -672,6 +677,17 @@ function renderBombFinished() {
   $("#bomb-input").value = "";
   $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o WORD BOMB!` : "Partida encerrada.";
   $("#bomb-feedback").className = "feedback correct";
+}
+
+async function requestBombRematch() {
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}/rematch`, { method: "POST", body: {} })).bomb;
+    await clearBombTyping();
+    renderBomb();
+    toast("Lobby restaurado. Todos precisam marcar pronto novamente.");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function leaveBomb() {
@@ -977,8 +993,9 @@ function openInvite() {
     $("#join-modal").showModal();
   }
   if (bombCode) {
-    $("#bomb-join-code").value = bombCode.toUpperCase();
-    $("#bomb-modal").showModal();
+    state.pendingBombJoinCode = bombCode.toUpperCase();
+    if (isGoogleUser()) completePendingBombJoin();
+    else toast("Faça login com Google para entrar diretamente no lobby");
   }
 }
 

@@ -272,6 +272,26 @@ class GameEngineTest(unittest.TestCase):
     def test_word_bomb_portuguese_dictionary_normalizes_accents(self):
         self.assertIn("maca", server.BOMB_WORDS["pt"])
 
+    def test_word_bomb_accepts_portuguese_answer_with_or_without_accent(self):
+        for answer in ("maca", "maçã"):
+            bomb = {
+                "code": "BOMB01", "status": "playing", "language": "pt", "round": 1, "turn": "one", "prompt": "ac",
+                "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+                "usedWords": {}, "usedPrompts": ["ac"],
+            }
+            with closing(server.connect_db()) as database, database:
+                _, accepted = server.apply_bomb_answer(database, bomb, "one", answer)
+            self.assertTrue(accepted)
+
+    def test_word_bomb_prompt_levels_keep_easy_pairs_friendly(self):
+        easy = server.BOMB_PROMPTS["pt"]["easy"]
+        hard = server.BOMB_PROMPTS["pt"]["hard"]
+        self.assertTrue({"ba", "ca", "ta"}.issubset(easy))
+        self.assertIn("st", hard)
+        for difficulty in server.BOMB_DIFFICULTIES:
+            self.assertNotIn("mm", server.BOMB_PROMPTS["pt"][difficulty])
+            self.assertNotIn("cc", server.BOMB_PROMPTS["pt"][difficulty])
+
     def test_word_bomb_keeps_current_turn_when_other_player_leaves(self):
         bomb = {
             "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",

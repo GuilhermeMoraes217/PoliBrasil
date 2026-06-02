@@ -226,6 +226,7 @@
             <div class="bomb-lobby-actions">
               <button id="bomb-ready" class="button secondary">ESTOU PRONTO</button>
               <button id="bomb-start" class="button primary">INICIAR PARTIDA</button>
+              <button id="bomb-rematch" class="button primary hidden">JOGAR NOVAMENTE</button>
             </div>
           </section>
         </div>
@@ -304,6 +305,12 @@
       <select id="bomb-language" class="category-choice">
         <option value="en">INGLÊS</option>
         <option value="pt">PORTUGUÊS</option>
+      </select>
+      <label>NÍVEL DAS SÍLABAS</label>
+      <select id="bomb-difficulty" class="category-choice">
+        <option value="easy">EASY · SÍLABAS COTIDIANAS</option>
+        <option value="medium">MEDIUM · COMBINAÇÕES FREQUENTES</option>
+        <option value="hard">HARD · TRECHOS INTERNOS</option>
       </select>
       <button id="create-bomb" class="button primary wide">CRIAR NOVA SALA</button>
       <div id="bomb-open-rooms" class="context-open-rooms"></div>
