@@ -23,7 +23,6 @@ PUBLIC = ROOT / "public"
 DATA = ROOT / "data" / "vocabulary.json"
 FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
-FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
 BOMB_MAX_PLAYERS = 8
@@ -42,6 +41,21 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
+
+
+def load_firebase_api_key() -> str:
+    configured_key = os.getenv("POLI_FIREBASE_API_KEY", "").strip()
+    if configured_key:
+        return configured_key
+    config_file = PUBLIC / "firebase-config.js"
+    config_text = config_file.read_text(encoding="utf-8")
+    match = re.search(r'apiKey:\s*"([^"]+)"', config_text)
+    if not match:
+        raise RuntimeError("Configure POLI_FIREBASE_API_KEY or public/firebase-config.js.")
+    return match.group(1)
+
+
+FIREBASE_API_KEY = load_firebase_api_key()
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
