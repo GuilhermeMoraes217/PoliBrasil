@@ -21,22 +21,29 @@ def normalize(value: str) -> str:
     return re.sub(r"[^a-z]", "", "".join(char for char in text if unicodedata.category(char) != "Mn"))
 
 
+def normalized_words(values) -> set[str]:
+    words = set()
+    for value in values:
+        source = value.strip()
+        if not source or any(not (char.isalpha() or char in "-'’") for char in source):
+            continue
+        word = normalize(source)
+        if 3 <= len(word) <= 64:
+            words.add(word)
+    return words
+
+
 def read_hunspell(url: str) -> set[str]:
     with urllib.request.urlopen(url, timeout=30) as response:
         lines = response.read().decode("utf-8-sig", errors="ignore").splitlines()
-    words = set()
-    for line in lines[1:]:
-        word = normalize(line.split("/", 1)[0].strip())
-        if len(word) >= 3:
-            words.add(word)
-    return words
+    return normalized_words(line.split("/", 1)[0] for line in lines[1:])
 
 
 def build_chunks() -> dict:
     freedict = json.loads(FREEDICT.read_text(encoding="utf-8"))
     languages = {
-        "en": set(freedict["english"]),
-        "pt": set(freedict["portuguese"]),
+        "en": normalized_words(freedict["english"]),
+        "pt": normalized_words(freedict["portuguese"]),
     }
     for language, url in SOURCES.items():
         languages[language].update(read_hunspell(url))
@@ -55,8 +62,21 @@ def build_chunks() -> dict:
     }
 
 
+def validate_firebase_keys(payload: dict) -> None:
+    def walk(node) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            if not key or any(char in key for char in ".#$[]/"):
+                raise ValueError(f"Chave invalida para Firebase: {key!r}")
+            walk(value)
+
+    walk(payload)
+
+
 def main() -> None:
     payload = build_chunks()
+    validate_firebase_keys(payload)
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Arquivo gerado: {OUTPUT}")
     print(f"Palavras: {payload['metadata']['words']}")

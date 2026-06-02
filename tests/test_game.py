@@ -7,6 +7,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import server
+from scripts import build_firebase_bomb_vocabulary
 
 
 class GameEngineTest(unittest.TestCase):
@@ -295,6 +296,11 @@ class GameEngineTest(unittest.TestCase):
         response = io.BytesIO(json.dumps({"poliglota": True}).encode())
         with patch("server.urllib.request.urlopen", return_value=response):
             self.assertTrue(server.bomb_word_exists("pt", "poliglota"))
+
+    def test_firebase_bomb_vocabulary_filters_invalid_keys(self):
+        words = build_firebase_bomb_vocabulary.normalized_words(["etc.", "either ... or", "maçã", "guarda-chuva"])
+        self.assertEqual(words, {"maca", "guardachuva"})
+        build_firebase_bomb_vocabulary.validate_firebase_keys({"chunks": {"pt": {"ma": {"maca": True}}}})
 
 
 if __name__ == "__main__":
