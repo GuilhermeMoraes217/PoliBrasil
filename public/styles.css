@@ -170,13 +170,13 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .context-open-rooms { margin-top: 18px; }.context-open-rooms p { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
 .context-room { align-items: center; background: #07110d; border: 1px solid var(--line); color: var(--cream); display: grid; font-size: 10px; gap: 8px; grid-template-columns: 1fr auto; margin-top: 8px; padding: 11px; text-align: left; width: 100%; }
 .context-room b { color: var(--green); }.context-room span { color: var(--muted); }
-.bomb-layout { margin: 16px auto 0; max-width: 1180px; }
-#bomb-screen { margin-bottom: -42px; margin-top: -34px; }
-.bomb-arena { max-width: 1180px; min-height: 0; padding: 20px 28px 18px; text-align: center; }.bomb-arena h2 { color: #67e8f9; text-transform: uppercase; }
+.bomb-layout { margin: 12px auto 0; max-width: none; }
+#bomb-screen { margin-bottom: -42px; margin-left: calc(50% - 50vw + 16px); margin-top: -34px; width: calc(100vw - 32px); }
+.bomb-arena { max-width: none; min-height: 0; padding: 20px 34px 18px; text-align: center; width: 100%; }.bomb-arena h2 { color: #67e8f9; text-transform: uppercase; }
 #bomb-prefix { color: #67e8f9; } #bomb-live-typing { color: var(--green-bright); }
 .bomb-live-word { color: var(--green-bright); font-family: "Press Start 2P"; font-size: 15px; min-height: 22px; overflow-wrap: anywhere; }
 .bomb-arena h2 { font-size: clamp(32px, 5vw, 58px); margin: 12px 0; min-height: 66px; overflow-wrap: anywhere; }
-.bomb-turn-stage { margin: 12px 0; min-height: 360px; position: relative; }
+.bomb-turn-stage { margin: 12px 0; min-height: 320px; position: relative; }
 .bomb-players { inset: 0; position: absolute; z-index: 3; }
 .bomb-player-slot { left: calc(50% + var(--player-x)); position: absolute; top: calc(50% + var(--player-y)); transform: translate(-50%,-50%); width: 245px; }
 .bomb-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 7px 9px; grid-template-columns: 22px 44px 1fr; padding: 11px; text-align: left; }
@@ -197,9 +197,11 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 #bomb-screen.danger #bomb-timer-number, #bomb-screen.danger #bomb-prompt { color: var(--danger); animation: blink .36s steps(2) infinite; }
 #bomb-screen.danger .bomb-core { border-color: var(--danger); box-shadow: 0 0 32px rgba(255,107,122,.6); }
 #bomb-screen.danger .bomb-direction-arrow { background: var(--danger); } #bomb-screen.danger .bomb-direction-arrow::after { border-left-color: var(--danger); }
-#bomb-form { display: flex; gap: 10px; margin: 12px auto 0; max-width: 900px; }
+.bomb-answer-dock { background: rgba(13,25,20,.96); border: 1px solid var(--line); box-shadow: var(--shadow); margin: 12px auto 0; max-width: 1180px; padding: 10px 14px 6px; width: min(1180px,calc(100vw - 32px)); }
+#bomb-form { display: flex; gap: 10px; margin: 0 auto; max-width: none; }
 #bomb-input { font-size: 16px; min-height: 52px; }
 #bomb-form .button { min-width: 110px; }
+.bomb-answer-dock .feedback { margin: 8px 0 0; text-align: center; }
 .bomb-lobby-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
 #bomb-invite { max-width: 760px; }
 .bomb-lobby-players { border: 1px solid var(--line); margin: 16px auto 10px; max-width: 760px; padding: 12px; text-align: left; }
@@ -207,8 +209,12 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .bomb-lobby-list { display: grid; gap: 7px; }
 .bomb-lobby-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 10px; grid-template-columns: 34px 1fr auto; padding: 7px 9px; }
 .bomb-lobby-avatar { height: 34px; width: 34px; }.bomb-lobby-player b { overflow-wrap: anywhere; }.bomb-lobby-player em { color: var(--green); font-size: 9px; font-style: normal; }
-#bomb-screen.waiting .bomb-turn-stage, #bomb-screen.waiting #bomb-form, #bomb-screen.waiting .bomb-timer-track { display: none; }
-#bomb-screen.finished .bomb-turn-stage, #bomb-screen.finished .bomb-timer-track, #bomb-screen.finished #bomb-invite, #bomb-screen.finished #bomb-form, #bomb-screen.finished .prompt-hint, #bomb-screen.finished .bomb-live-word { display: none; }
+#bomb-screen.waiting .bomb-arena, #bomb-screen.finished .bomb-arena { margin: auto; max-width: 1060px; min-height: 0; }
+#bomb-screen.waiting .bomb-turn-stage, #bomb-screen.waiting .bomb-answer-dock, #bomb-screen.waiting .bomb-timer-track { display: none; }
+#bomb-screen.finished .bomb-turn-stage, #bomb-screen.finished .bomb-timer-track, #bomb-screen.finished #bomb-invite, #bomb-screen.finished .bomb-answer-dock, #bomb-screen.finished .prompt-hint, #bomb-screen.finished .bomb-live-word { display: none; }
+#bomb-screen:not(.waiting):not(.finished) .bomb-layout { display: grid; grid-template-rows: minmax(0,1fr) auto; height: calc(100vh - 165px); }
+#bomb-screen:not(.waiting):not(.finished) .bomb-arena { display: flex; flex-direction: column; }
+#bomb-screen:not(.waiting):not(.finished) .bomb-turn-stage { flex: 1; }
 .bomb-finish-panel { background: linear-gradient(145deg,rgba(18,52,39,.96),rgba(7,17,13,.96)); border: 1px solid var(--green); box-shadow: 0 0 28px rgba(126,231,135,.18),var(--shadow); margin: 14px auto 8px; max-width: 680px; padding: 22px; }
 .bomb-finish-panel h3 { color: var(--green-bright); font-size: clamp(18px,3vw,28px); overflow-wrap: anywhere; }.bomb-finish-panel .muted { font-size: 12px; }
 .bomb-finish-scoreboard { border: 1px solid var(--line); margin-top: 16px; padding: 4px 12px; text-align: left; }
@@ -230,6 +236,7 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
   .battle-top span:nth-child(2) { display: none; }.arena-card { padding: 24px 14px; }.timer { margin: -24px -14px 28px; }
   #answer-form { display: block; } #answer-form button { margin-top: 9px; width: 100%; }.room-code { font-size: 24px; letter-spacing: 7px; padding: 18px 10px; }
   #context-form { display: block; } #context-form button { margin-top: 9px; width: 100%; }
+  #bomb-screen { margin-left: 0; width: auto; } #bomb-screen:not(.waiting):not(.finished) .bomb-layout { height: auto; }
   .music-track { max-width: 92px; }.bomb-arena { padding: 18px 14px; }.bomb-turn-stage { min-height: 270px; }.bomb-player-slot { width: 112px; }.bomb-core { height: 76px; width: 76px; }.bomb-core b { font-size: 21px; }.bomb-core small { font-size: 7px; }.bomb-direction-arrow { width: 92px; }.bomb-player { display: block; padding: 8px; text-align: center; }.bomb-position, .bomb-avatar:not(.bomb-lobby-avatar) { display: none; }.bomb-player b, .bomb-player span, .bomb-player em { display: block; font-size: 8px; margin-top: 5px; }.bomb-arena h2 { min-height: 58px; }
   #bomb-form { display: block; } #bomb-form button { margin-top: 9px; width: 100%; } #bomb-invite { display: block; } #bomb-invite .button { display: inline-block; margin-top: 8px; }
 }

@@ -532,8 +532,8 @@ function renderBomb() {
   ` : "";
   const turnStage = $(".bomb-turn-stage");
   const compactArena = turnStage.clientWidth < 600;
-  const orbitX = compactArena ? 30 : 36;
-  const orbitY = compactArena ? 34 : 36;
+  const orbitX = compactArena ? 30 : 40;
+  const orbitY = compactArena ? 34 : 38;
   $("#bomb-players").innerHTML = players.map((player, index) => {
     const angle = playerAngle(index, players.length);
     const radians = angle * Math.PI / 180;
