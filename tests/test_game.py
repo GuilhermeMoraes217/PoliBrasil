@@ -1,6 +1,9 @@
 import unittest
+import io
+import json
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import server
@@ -12,8 +15,13 @@ class GameEngineTest(unittest.TestCase):
         server.initialize_db()
         self.player_one = {"uid": "one", "name": "PLAYER_ONE", "photo": "", "hearts": 3, "score": 0}
         self.player_two = {"uid": "two", "name": "PLAYER_TWO", "photo": "", "hearts": 3, "score": 0}
+        self.remote_bomb_vocabulary = server.REMOTE_BOMB_VOCABULARY
+        server.REMOTE_BOMB_VOCABULARY = False
+        server.REMOTE_BOMB_CACHE.clear()
 
     def tearDown(self):
+        server.REMOTE_BOMB_VOCABULARY = self.remote_bomb_vocabulary
+        server.REMOTE_BOMB_CACHE.clear()
         for suffix in ("", "-shm", "-wal"):
             database_file = Path(f"{server.DATABASE}{suffix}")
             if database_file.exists():
@@ -281,6 +289,12 @@ class GameEngineTest(unittest.TestCase):
         with closing(server.connect_db()) as database:
             updated = server.read_bomb(database, "BOMB01")
         self.assertEqual(updated["turn"], "one")
+
+    def test_word_bomb_can_validate_remote_prefix_chunk(self):
+        server.REMOTE_BOMB_VOCABULARY = True
+        response = io.BytesIO(json.dumps({"poliglota": True}).encode())
+        with patch("server.urllib.request.urlopen", return_value=response):
+            self.assertTrue(server.bomb_word_exists("pt", "poliglota"))
 
 
 if __name__ == "__main__":

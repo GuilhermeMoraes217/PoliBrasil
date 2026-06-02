@@ -509,7 +509,7 @@ function renderBomb() {
   $("#bomb-input").disabled = !canAnswer;
   $("#bomb-input").placeholder = canAnswer ? "digite_apenas_o_restante..." : "aguarde_seu_turno...";
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
-  $("#bomb-live-typing").textContent = liveTyping.round === bomb.round ? liveTyping.value || "" : "";
+  $("#bomb-live-typing").textContent = bomb.status === "playing" && liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
   $("#bomb-invite").classList.toggle("hidden", !waiting);
   $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
@@ -634,6 +634,9 @@ async function clearBombTyping() {
 
 function renderBombFinished() {
   const winner = state.bomb.players[state.bomb.winner];
+  $("#bomb-prefix").textContent = "GG";
+  $("#bomb-live-typing").textContent = "";
+  $("#bomb-input").value = "";
   $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o WORD BOMB!` : "Partida encerrada.";
   $("#bomb-feedback").className = "feedback correct";
 }

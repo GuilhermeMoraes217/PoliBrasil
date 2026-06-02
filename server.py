@@ -24,11 +24,14 @@ DATA = ROOT / "data" / "vocabulary.json"
 FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
 FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
+FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
 BOMB_MAX_PLAYERS = 8
 LOCK = threading.RLock()
 TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
+REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
+REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
@@ -354,6 +357,27 @@ BOMB_WORDS = {language: bomb_dictionary(language) for language in ("en", "pt")}
 BOMB_PROMPTS = {language: build_bomb_prompts(language) for language in ("en", "pt")}
 
 
+def remote_bomb_words(language: str, prefix: str) -> set[str]:
+    key = (language, prefix)
+    if key in REMOTE_BOMB_CACHE:
+        return REMOTE_BOMB_CACHE[key]
+    words: set[str] = set()
+    if REMOTE_BOMB_VOCABULARY:
+        url = f"{FIREBASE_DATABASE_URL}/bombVocabulary/chunks/{language}/{prefix}.json"
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                payload = json.load(response) or {}
+            words = set(payload if isinstance(payload, list) else payload)
+        except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError):
+            pass
+    REMOTE_BOMB_CACHE[key] = words
+    return words
+
+
+def bomb_word_exists(language: str, word: str) -> bool:
+    return word in BOMB_WORDS[language] or word in remote_bomb_words(language, word[:2])
+
+
 def public_bomb(bomb: dict) -> dict:
     public = json.loads(json.dumps(bomb))
     public["serverNow"] = now_ms()
@@ -422,7 +446,7 @@ def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer
     valid = (
         len(normalized) >= 3
         and normalized.startswith(bomb["prompt"])
-        and normalized in BOMB_WORDS[bomb["language"]]
+        and bomb_word_exists(bomb["language"], normalized)
         and normalized not in bomb.setdefault("usedWords", {})
     )
     if not valid:

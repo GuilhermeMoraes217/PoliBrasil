@@ -6,6 +6,10 @@
       ".read": false,
       ".write": false
     },
+    "bombVocabulary": {
+      ".read": true,
+      ".write": false
+    },
     "liveBombRooms": {
       "$room": {
         "typing": {

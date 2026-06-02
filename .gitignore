@@ -9,3 +9,4 @@ data/poli.db-wal
 data/test-*.db*
 data/word_cefr_minified.db
 data/freedict-eng-por-0.3.src.tar.xz
+data/firebase-bomb-vocabulary.json

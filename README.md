@@ -75,6 +75,18 @@ No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode cria
 
 Para ampliar as sugestões offline português→inglês, o projeto também usa o dicionário livre [FreeDict eng-por](https://download.freedict.org/dictionaries/eng-por/0.3/), sob licença GPL-2.0-or-later. O índice processado possui mais de 15 mil verbetes ingleses e 17 mil traduções portuguesas. Nenhum dicionário finito cobre literalmente todas as palavras e flexões possíveis, mas essa camada oferece um fallback amplo além da curadoria pedagógica.
 
+## Vocabulário amplo do Word Bomb no Firebase
+
+O `Word Bomb` pode consultar blocos remotos particionados por idioma e prefixo no Realtime Database. O gerador combina o FreeDict local com os dicionários Hunspell `en_US` e `pt_BR` do repositório oficial [LibreOffice/dictionaries](https://github.com/LibreOffice/dictionaries):
+
+```powershell
+python scripts/build_firebase_bomb_vocabulary.py
+```
+
+O arquivo ignorado `data/firebase-bomb-vocabulary.json` é gerado localmente. No Firebase Console, abra **Realtime Database > Data**, crie ou selecione o nó `/bombVocabulary` e use **Import JSON** com esse arquivo. Depois publique `firebase.rules.json`.
+
+O backend consulta somente o bloco necessário, por exemplo `/bombVocabulary/chunks/pt/pa`, e mantém cache em memória. Se o Firebase estiver indisponível, a base local continua funcionando. Para desativar consultas remotas, configure `POLI_REMOTE_BOMB_VOCABULARY=0`.
+
 ## Ativar Firebase e Google Login
 
 1. No [console do Firebase](https://console.firebase.google.com/), abra o projeto `poligbrasil-2022`.
@@ -94,6 +106,7 @@ https://poligbrasil-2022-default-rtdb.firebaseio.com/
 - `server.py`: servidor Python, API de partidas e validação de tokens Firebase.
 - `data/vocabulary.json`: palavras iniciais dos dois modos.
 - `scripts/build_vocabulary.py`: fonte curada e gerador do vocabulário JSON.
+- `scripts/build_firebase_bomb_vocabulary.py`: gera o payload remoto particionado do Word Bomb.
 - `data/poli.db`: banco SQLite criado automaticamente pelo servidor.
 - `public/`: frontend HTML, CSS e JavaScript.
 - `firebase.rules.json`: libera somente o texto temporário digitado no `Word Bomb`; estado competitivo permanece bloqueado.

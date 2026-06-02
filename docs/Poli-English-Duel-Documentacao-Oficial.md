@@ -213,6 +213,8 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 
 O Python continua autoritativo para lobby, participantes, início, turnos, validação, vidas, encerramento, XP e histórico. O Firebase Realtime Database transporta apenas o rascunho temporário digitado pelo jogador ativo. Esse dado não concede pontos e não altera o resultado da partida.
 
+Para ampliar a aceitação de respostas sem sobrecarregar o espaço do PythonAnywhere, o backend também pode consultar blocos públicos de vocabulário particionados por idioma e prefixo no Realtime Database. Cada bloco é mantido em cache após a primeira consulta. A indisponibilidade do Firebase não interrompe a partida, pois a base local permanece como fallback.
+
 # 5. Gamificação
 
 ## 5.1 Corações
@@ -419,13 +421,17 @@ Credenciais administrativas, chaves privadas e `client secret` OAuth não são e
 
 ## 8.3 Realtime Database
 
-O Firebase Realtime Database não recebe estado competitivo. No Word Bomb, ele transmite somente a digitação temporária ao vivo. Cada usuário autenticado pode escrever ou apagar apenas o próprio rascunho, limitado a 32 caracteres:
+O Firebase Realtime Database não recebe estado competitivo. No Word Bomb, ele transmite somente a digitação temporária ao vivo. Cada usuário autenticado pode escrever ou apagar apenas o próprio rascunho, limitado a 64 caracteres. O banco também expõe publicamente os blocos estáticos de vocabulário amplo:
 
 ```json
 {
   "rules": {
     ".read": false,
     ".write": false,
+    "bombVocabulary": {
+      ".read": true,
+      ".write": false
+    },
     "liveBombRooms": {
       "$room": {
         "typing": {
@@ -442,11 +448,29 @@ O Firebase Realtime Database não recebe estado competitivo. No Word Bomb, ele t
 
 O estado competitivo fica no SQLite do backend. Isso impede que um jogador altere XP, corações, respostas ou salas diretamente pelo DevTools.
 
-## 8.4 Palavra secreta protegida
+## 8.4 Vocabulário remoto particionado
+
+O script `scripts/build_firebase_bomb_vocabulary.py` combina:
+
+- Índice FreeDict `eng-por 0.3`.
+- Dicionário Hunspell `en_US` do LibreOffice.
+- Dicionário Hunspell `pt_BR` do LibreOffice.
+
+O resultado é salvo localmente em `data/firebase-bomb-vocabulary.json`, arquivo gerado e ignorado pelo Git. Para publicar:
+
+1. Execute `python scripts/build_firebase_bomb_vocabulary.py`.
+2. Abra **Firebase Console > Realtime Database > Data**.
+3. Crie ou selecione o nó `/bombVocabulary`.
+4. Use **Import JSON** com o arquivo gerado.
+5. Publique `firebase.rules.json` em **Realtime Database > Rules**.
+
+O backend consulta caminhos como `/bombVocabulary/chunks/pt/pa`. A variável opcional `POLI_REMOTE_BOMB_VOCABULARY=0` desativa a consulta remota sem remover o fallback local.
+
+## 8.5 Palavra secreta protegida
 
 No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida está ativa. A resposta permanece no backend e apenas o resultado público das tentativas é retornado.
 
-## 8.5 Limites atuais
+## 8.6 Limites atuais
 
 - O MVP utiliza SQLite e uma única instância.
 - Não há painel administrativo.
@@ -520,6 +544,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 | `scripts/build_vocabulary.py` | Geração do vocabulário |
 | `scripts/fetch_cefr_dataset.py` | Download do dataset CEFR |
 | `scripts/fetch_freedict_dictionary.py` | Processamento FreeDict |
+| `scripts/build_firebase_bomb_vocabulary.py` | Geração do payload remoto particionado do Word Bomb |
 | `tests/test_game.py` | Testes do motor |
 | `tests/test_wsgi.py` | Testes da entrada Flask |
 | `firebase.rules.json` | Regras restritivas com exceção do rascunho temporário do Word Bomb |
