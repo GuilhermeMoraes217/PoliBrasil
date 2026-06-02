@@ -178,19 +178,19 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .bomb-arena h2 { font-size: clamp(32px, 5vw, 58px); margin: 12px 0; min-height: 66px; overflow-wrap: anywhere; }
 .bomb-turn-stage { margin: 12px auto; max-width: 1560px; min-height: 320px; position: relative; width: 100%; }
 .bomb-players { inset: 0; position: absolute; z-index: 3; }
-.bomb-player-slot { left: calc(50% + var(--player-x)); position: absolute; top: calc(50% + var(--player-y)); transform: translate(-50%,-50%); width: 245px; }
-.bomb-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 7px 9px; grid-template-columns: 22px 44px 1fr; padding: 11px; text-align: left; }
+.bomb-player-slot { left: calc(50% + var(--player-x)); position: absolute; top: calc(50% + var(--player-y)); transform: translate(-50%,-50%); width: 218px; }
+.bomb-player { align-items: center; background: #07110d; border: 1px solid var(--line); display: grid; font-size: 9px; gap: 5px 7px; grid-template-columns: 18px 38px 1fr; padding: 8px; text-align: left; }
 .bomb-player.active { border-color: var(--green); box-shadow: 0 0 16px rgba(126,231,135,.3); }
 .bomb-player.out { opacity: .42; }.bomb-player b { overflow-wrap: anywhere; }.bomb-player span:not(.bomb-position,.avatar) { color: var(--muted); }
-.bomb-player em { color: var(--green); font-size: 9px; font-style: normal; grid-column: 3; }.bomb-position { color: var(--purple); grid-row: 1 / 4; }
-.bomb-avatar { grid-row: 1 / 4; height: 44px; width: 44px; }
+.bomb-player em { color: var(--green); font-size: 8px; font-style: normal; grid-column: 3; }.bomb-position { color: var(--purple); grid-row: 1 / 4; }
+.bomb-avatar { grid-row: 1 / 4; height: 38px; width: 38px; }
 .bomb-center { align-items: center; display: flex; inset: 0; justify-content: center; pointer-events: none; position: absolute; z-index: 2; }
 .bomb-core { align-items: center; background: radial-gradient(circle at 38% 30%, #263f35, #07110d 68%); border: 3px solid var(--green); border-radius: 50%; box-shadow: 0 0 22px rgba(126,231,135,.28); display: flex; flex-direction: column; height: 112px; justify-content: center; position: relative; width: 112px; z-index: 2; }
 .bomb-core b { color: var(--green-bright); font-family: "Press Start 2P"; font-size: 34px; }.bomb-core small { color: var(--muted); font-size: 9px; letter-spacing: 2px; margin-top: 7px; }
 .bomb-fuse { background: var(--green); height: 24px; position: absolute; right: 10px; top: -20px; transform: rotate(38deg); width: 4px; }
 .bomb-direction-arrow { background: repeating-linear-gradient(90deg,var(--green) 0 14px,transparent 14px 20px); filter: drop-shadow(0 0 7px rgba(126,231,135,.72)); height: 4px; left: 50%; opacity: .8; pointer-events: none; position: absolute; top: 50%; transform-origin: left center; transition: transform .28s ease,width .28s ease; width: 220px; z-index: 1; }
 .bomb-direction-arrow::before { background: var(--green); border-radius: 50%; box-shadow: 0 0 10px var(--green); content: ""; height: 10px; left: 11px; position: absolute; top: -3px; width: 10px; }
-.bomb-direction-arrow::after { border-bottom: 13px solid transparent; border-left: 22px solid var(--green); border-top: 13px solid transparent; content: ""; position: absolute; right: -8px; top: -11px; }
+.bomb-direction-arrow::after { border-bottom: 10px solid transparent; border-left: 17px solid var(--green); border-top: 10px solid transparent; content: ""; position: absolute; right: -6px; top: -8px; }
 .bomb-timer-track { background: #07110d; height: 6px; margin: 8px auto 12px; max-width: 760px; }.bomb-timer-track i { background: var(--green); display: block; height: 100%; transition: width .3s linear; width: 100%; }
 #bomb-screen.danger .bomb-arena { animation: bomb-danger .52s steps(2) infinite; border-color: var(--danger); }
 #bomb-screen.danger #bomb-timer-bar { background: var(--danger); }

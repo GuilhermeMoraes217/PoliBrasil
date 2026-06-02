@@ -532,28 +532,17 @@ function renderBomb() {
   ` : "";
   const turnStage = $(".bomb-turn-stage");
   const compactArena = turnStage.clientWidth < 600;
-  const orbitX = compactArena ? 30 : 34;
-  const orbitY = compactArena ? 34 : 38;
   $("#bomb-players").innerHTML = players.map((player, index) => {
-    const angle = playerAngle(index, players.length);
-    const radians = angle * Math.PI / 180;
-    return `<div class="bomb-player-slot" style="--player-x:${Math.cos(radians) * orbitX}%;--player-y:${Math.sin(radians) * orbitY}%">${playerCard(player, index)}</div>`;
+    const position = playerPosition(index, players.length, compactArena);
+    return `<div class="bomb-player-slot" style="--player-x:${position.x}%;--player-y:${position.y}%">${playerCard(player, index)}</div>`;
   }).join("");
   const activeIndex = players.findIndex((player) => player.uid === bomb.turn);
-  const activeAngle = playerAngle(activeIndex, players.length);
-  const activeRadians = activeAngle * Math.PI / 180;
-  const cardInset = (
-    Math.abs(Math.cos(activeRadians)) * (compactArena ? 56 : 122)
-    + Math.abs(Math.sin(activeRadians)) * (compactArena ? 32 : 42)
-  );
-  const arrowLength = (
-    Math.hypot(
-      Math.cos(activeRadians) * turnStage.clientWidth * orbitX / 100,
-      Math.sin(activeRadians) * turnStage.clientHeight * orbitY / 100
-    )
-    - cardInset
-  );
-  $("#bomb-turn-arrow").style.width = `${Math.max(54, arrowLength)}px`;
+  const activePosition = playerPosition(activeIndex, players.length, compactArena);
+  const activeX = activePosition.x * turnStage.clientWidth / 100;
+  const activeY = activePosition.y * turnStage.clientHeight / 100;
+  const activeAngle = Math.atan2(activeY, activeX) * 180 / Math.PI;
+  const arrowLength = Math.hypot(activeX, activeY) - (compactArena ? 74 : 152);
+  $("#bomb-turn-arrow").style.width = `${Math.max(54, Math.min(compactArena ? 92 : 260, arrowLength))}px`;
   $("#bomb-turn-arrow").style.transform = `rotate(${activeAngle}deg)`;
   $("#bomb-turn-arrow").classList.toggle("hidden", bomb.status !== "playing");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
@@ -602,10 +591,21 @@ function renderBombFeedback(feedback) {
   }
 }
 
-function playerAngle(index, total) {
-  if (index < 0 || total < 1) return 0;
-  if (total === 2) return index === 0 ? 180 : 0;
-  return -90 + (360 / total) * index;
+function playerPosition(index, total, compact = false) {
+  if (index < 0 || total < 1) return { x: 0, y: 0 };
+  const side = index % 2 === 0 ? -1 : 1;
+  const sideIndex = Math.floor(index / 2);
+  const sideTotal = side < 0 ? Math.ceil(total / 2) : Math.floor(total / 2);
+  const verticalSteps = {
+    1: [0],
+    2: [-24, 24],
+    3: [-32, 0, 32],
+    4: [-38, -13, 13, 38],
+  };
+  return {
+    x: side * (compact ? 30 : 38),
+    y: verticalSteps[sideTotal]?.[sideIndex] || 0,
+  };
 }
 
 function bombLevelLabel(bomb) {
