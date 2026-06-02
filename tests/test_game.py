@@ -207,6 +207,70 @@ class GameEngineTest(unittest.TestCase):
             ranking_count = database.execute("SELECT COUNT(*) FROM rankings").fetchone()[0]
         self.assertEqual(ranking_count, 0)
 
+    def test_word_bomb_accepts_dictionary_word_with_prompt_and_moves_turn(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["oo"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "book")
+        self.assertTrue(accepted)
+        self.assertEqual(bomb["players"]["one"]["score"], 100)
+        self.assertEqual(bomb["turn"], "two")
+
+    def test_word_bomb_invalid_word_keeps_turn_until_timeout(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["oo"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "inventedword")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["turn"], "one")
+        self.assertEqual(bomb["players"]["one"]["hearts"], 3)
+
+    def test_word_bomb_timeout_removes_heart_and_moves_turn(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["oo"], "deadline": 0,
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb = server.advance_bomb(database, bomb)
+        self.assertEqual(bomb["players"]["one"]["hearts"], 2)
+        self.assertEqual(bomb["turn"], "two")
+
+    def test_word_bomb_public_state_hides_used_words(self):
+        bomb = {"code": "BOMB01", "players": {}, "usedWords": {"book": True}, "usedPrompts": ["oo"]}
+        public = server.public_bomb(bomb)
+        self.assertNotIn("usedWords", public)
+        self.assertNotIn("usedPrompts", public)
+        self.assertIn("serverNow", public)
+
+    def test_word_bomb_portuguese_dictionary_normalizes_accents(self):
+        self.assertIn("maca", server.BOMB_WORDS["pt"])
+
+    def test_word_bomb_keeps_current_turn_when_other_player_leaves(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
+            "players": {
+                "one": self.player_one.copy(),
+                "two": self.player_two.copy(),
+                "three": {"uid": "three", "name": "PLAYER_THREE", "photo": "", "hearts": 3, "score": 0},
+            },
+            "order": ["one", "two", "three"], "usedWords": {}, "usedPrompts": ["oo"],
+        }
+        with closing(server.connect_db()) as database, database:
+            server.write_bomb(database, bomb)
+        handler = server.PoliHandler.__new__(server.PoliHandler)
+        handler.send_json = lambda payload, status=200: payload
+        handler.leave_bomb("BOMB01", {"uid": "two"}, {})
+        with closing(server.connect_db()) as database:
+            updated = server.read_bomb(database, "BOMB01")
+        self.assertEqual(updated["turn"], "one")
+
 
 if __name__ == "__main__":
     unittest.main()

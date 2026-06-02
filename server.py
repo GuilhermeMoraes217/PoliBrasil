@@ -25,6 +25,7 @@ FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
 FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 ROUND_SECONDS = 10
+BOMB_MAX_PLAYERS = 8
 LOCK = threading.RLock()
 TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
@@ -97,6 +98,11 @@ def initialize_db() -> None:
                 payload TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS bombs (
+                code TEXT PRIMARY KEY,
+                payload TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
             """
         )
 
@@ -127,6 +133,21 @@ def write_context(database: sqlite3.Connection, context: dict) -> None:
         ON CONFLICT(code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
         """,
         (context["code"], json.dumps(context, ensure_ascii=False), now_ms()),
+    )
+
+
+def read_bomb(database: sqlite3.Connection, code: str) -> dict | None:
+    row = database.execute("SELECT payload FROM bombs WHERE code = ?", (code,)).fetchone()
+    return json.loads(row["payload"]) if row else None
+
+
+def write_bomb(database: sqlite3.Connection, bomb: dict) -> None:
+    database.execute(
+        """
+        INSERT INTO bombs(code, payload, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+        """,
+        (bomb["code"], json.dumps(bomb, ensure_ascii=False), now_ms()),
     )
 
 
@@ -309,6 +330,120 @@ def record_context_ranking(database: sqlite3.Connection, context: dict) -> dict:
     return context
 
 
+def bomb_dictionary(language: str) -> set[str]:
+    if language == "pt":
+        return {
+            normalize(word) for word in FREEDICT["portuguese"]
+            if len(normalize(word)) >= 3 and normalize(word).isalpha()
+        }
+    return {
+        normalize(word) for word in FREEDICT["english"]
+        if len(normalize(word)) >= 3 and normalize(word).isalpha()
+    }
+
+
+def build_bomb_prompts(language: str) -> list[str]:
+    frequency: dict[str, int] = {}
+    for word in bomb_dictionary(language):
+        for index in range(len(word) - 1):
+            prompt = word[index:index + 2]
+            frequency[prompt] = frequency.get(prompt, 0) + 1
+    return [prompt for prompt, count in frequency.items() if count >= 12]
+
+
+BOMB_WORDS = {language: bomb_dictionary(language) for language in ("en", "pt")}
+BOMB_PROMPTS = {language: build_bomb_prompts(language) for language in ("en", "pt")}
+
+
+def public_bomb(bomb: dict) -> dict:
+    public = json.loads(json.dumps(bomb))
+    public["serverNow"] = now_ms()
+    public.pop("usedWords", None)
+    public.pop("usedPrompts", None)
+    return public
+
+
+def record_bomb_ranking(database: sqlite3.Connection, bomb: dict) -> dict:
+    if bomb.get("rankingRecorded"):
+        return bomb
+    if len(bomb["players"]) < 2:
+        bomb["rankingRecorded"] = True
+        return bomb
+    for player in bomb["players"].values():
+        won = player["uid"] == bomb.get("winner")
+        update_ranking(database, player, won)
+        database.execute(
+            "INSERT INTO history(uid, room_code, opponent, mode, result, xp, played_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (player["uid"], bomb["code"], "WORD_BOMB", "word_bomb", "win" if won else "loss", player.get("score", 0), now_ms()),
+        )
+    bomb["rankingRecorded"] = True
+    return bomb
+
+
+def finish_bomb(database: sqlite3.Connection, bomb: dict, winner: str | None, reason: str) -> dict:
+    if bomb["status"] == "finished":
+        return bomb
+    bomb.update({"status": "finished", "winner": winner, "finishReason": reason, "deadline": now_ms()})
+    return record_bomb_ranking(database, bomb)
+
+
+def bomb_alive_players(bomb: dict) -> list[str]:
+    return [
+        uid for uid in bomb.get("order", [])
+        if uid in bomb["players"] and bomb["players"][uid].get("hearts", 0) > 0
+    ]
+
+
+def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> dict:
+    alive = bomb_alive_players(bomb)
+    if len(alive) <= 1:
+        if database:
+            return finish_bomb(database, bomb, alive[0] if alive else None, "last_player")
+        bomb.update({"status": "finished", "winner": alive[0] if alive else None, "finishReason": "last_player"})
+        return bomb
+    bomb["round"] = bomb.get("round", 0) + 1
+    current = bomb.get("turn")
+    current_index = alive.index(current) if current in alive else -1
+    bomb["turn"] = alive[(current_index + 1) % len(alive)]
+    prompts = BOMB_PROMPTS[bomb["language"]]
+    available = [prompt for prompt in prompts if prompt not in bomb.setdefault("usedPrompts", [])]
+    if not available:
+        bomb["usedPrompts"] = []
+        available = prompts
+    bomb["prompt"] = random.choice(available)
+    bomb["usedPrompts"].append(bomb["prompt"])
+    bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+    return bomb
+
+
+def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer: str) -> tuple[dict, bool]:
+    if bomb["status"] != "playing" or bomb.get("turn") != uid:
+        return bomb, False
+    normalized = normalize(answer)
+    valid = (
+        len(normalized) >= 3
+        and bomb["prompt"] in normalized
+        and normalized in BOMB_WORDS[bomb["language"]]
+        and normalized not in bomb.setdefault("usedWords", {})
+    )
+    if not valid:
+        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "invalid", "answer": normalized}
+        return bomb, False
+    bomb["usedWords"][normalized] = True
+    bomb["players"][uid]["score"] = bomb["players"][uid].get("score", 0) + 100
+    bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "correct", "answer": normalized, "xp": 100}
+    return next_bomb_turn(bomb, database), True
+
+
+def advance_bomb(database: sqlite3.Connection, bomb: dict) -> dict:
+    if bomb["status"] != "playing" or bomb.get("deadline", 0) > now_ms():
+        return bomb
+    player = bomb["players"][bomb["turn"]]
+    player["hearts"] = max(0, player.get("hearts", 0) - 1)
+    bomb["lastFeedback"] = {"id": now_ms(), "uid": player["uid"], "kind": "timeout", "answer": bomb["prompt"]}
+    return next_bomb_turn(bomb, database)
+
+
 def apply_answer(database: sqlite3.Connection, room: dict, uid: str, answer: str, timed_out: bool = False) -> dict:
     if room["status"] != "playing" or room.get("turn") != uid:
         return room
@@ -378,6 +513,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
         if path == "/api/contexts":
             user = self.require_user()
             return self.send_json({"contexts": self.get_open_contexts(user["uid"])}) if user else None
+        if path == "/api/bombs":
+            user = self.require_user()
+            return self.send_json({"bombs": self.get_open_bombs(user["uid"])}) if user else None
+        if path.startswith("/api/bombs/"):
+            user = self.require_user()
+            return self.get_bomb(path.split("/")[-1], user) if user else None
         if path.startswith("/api/contexts/"):
             user = self.require_user()
             return self.get_context(path.split("/")[-1], user) if user else None
@@ -398,6 +539,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.create_room(user, payload)
         if path == "/api/contexts":
             return self.create_context(user, payload)
+        if path == "/api/bombs":
+            return self.create_bomb(user, payload)
+        bomb_match = re.fullmatch(r"/api/bombs/([A-Z0-9]{6})/(join|ready|start|answer|leave)", path)
+        if bomb_match:
+            code, action = bomb_match.groups()
+            return getattr(self, f"{action}_bomb")(code, user, payload)
         context_match = re.fullmatch(r"/api/contexts/([A-Z0-9]{6})/(join|suggest|guess)", path)
         if context_match:
             code, action = context_match.groups()
@@ -407,6 +554,130 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "Endpoint not found"}, status=404)
         code, action = match.groups()
         return getattr(self, f"{action}_room")(code, user, payload)
+
+    def create_bomb(self, user: dict, payload: dict):
+        language = payload.get("language", "en")
+        if language not in {"en", "pt"}:
+            return self.send_json({"error": "Idioma invalido"}, status=400)
+        with LOCK, closing(connect_db()) as database, database:
+            code = random_code()
+            while read_bomb(database, code):
+                code = random_code()
+            player = self.player_from_user(user)
+            player["ready"] = False
+            bomb = {
+                "code": code, "owner": user["uid"], "language": language, "status": "waiting",
+                "createdAt": now_ms(), "round": 0, "players": {user["uid"]: player}, "order": [user["uid"]],
+                "usedWords": {}, "usedPrompts": [],
+            }
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)}, status=201)
+
+    def get_bomb(self, code: str, user: dict):
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code.upper())
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            bomb = advance_bomb(database, bomb)
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
+    def join_bomb(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb:
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            if bomb["status"] != "waiting" and user["uid"] not in bomb["players"]:
+                return self.send_json({"error": "Esta partida ja comecou"}, status=409)
+            if len(bomb["players"]) >= BOMB_MAX_PLAYERS and user["uid"] not in bomb["players"]:
+                return self.send_json({"error": "Esta sala ja esta cheia"}, status=409)
+            if user["uid"] not in bomb["players"]:
+                player = self.player_from_user(user)
+                player["ready"] = False
+                bomb["players"][user["uid"]] = player
+                bomb["order"].append(user["uid"])
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
+    def ready_bomb(self, code: str, user: dict, payload: dict):
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            if bomb["status"] != "waiting":
+                return self.send_json({"error": "A partida ja comecou"}, status=409)
+            bomb["players"][user["uid"]]["ready"] = bool(payload.get("ready"))
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
+    def start_bomb(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            if bomb["owner"] != user["uid"]:
+                return self.send_json({"error": "Somente o host pode iniciar a partida"}, status=403)
+            if bomb["status"] != "waiting":
+                return self.send_json({"error": "A partida ja comecou"}, status=409)
+            if len(bomb["players"]) < 2 or not all(player.get("ready") for player in bomb["players"].values()):
+                return self.send_json({"error": "Todos os jogadores precisam estar prontos"}, status=409)
+            bomb["status"] = "playing"
+            bomb = next_bomb_turn(bomb, database)
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
+    def answer_bomb(self, code: str, user: dict, payload: dict):
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            bomb = advance_bomb(database, bomb)
+            if payload.get("round") != bomb.get("round"):
+                write_bomb(database, bomb)
+                return self.send_json({"bomb": public_bomb(bomb)})
+            bomb, accepted = apply_bomb_answer(database, bomb, user["uid"], str(payload.get("answer", "")))
+            write_bomb(database, bomb)
+        status = 200 if accepted else 400
+        return self.send_json({"bomb": public_bomb(bomb), "error": None if accepted else "Palavra invalida. Tente novamente antes do tempo acabar."}, status=status)
+
+    def leave_bomb(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"ok": True})
+            if bomb["status"] == "waiting":
+                bomb["players"].pop(user["uid"], None)
+                bomb["order"] = [uid for uid in bomb["order"] if uid != user["uid"]]
+                if bomb["owner"] == user["uid"] and bomb["order"]:
+                    bomb["owner"] = bomb["order"][0]
+                if not bomb["players"]:
+                    bomb["status"] = "finished"
+                    bomb["finishReason"] = "cancelled"
+            elif bomb["status"] == "playing":
+                bomb["players"][user["uid"]]["hearts"] = 0
+                alive = bomb_alive_players(bomb)
+                if len(alive) <= 1:
+                    bomb = finish_bomb(database, bomb, alive[0] if alive else None, "last_player")
+                elif bomb.get("turn") == user["uid"]:
+                    bomb = next_bomb_turn(bomb, database)
+            write_bomb(database, bomb)
+        return self.send_json({"ok": True})
+
+    def get_open_bombs(self, uid: str):
+        with closing(connect_db()) as database, database:
+            rows = database.execute("SELECT payload FROM bombs ORDER BY updated_at DESC").fetchall()
+        bombs = []
+        for row in rows:
+            bomb = json.loads(row["payload"])
+            if bomb.get("status") in {"waiting", "playing"} and uid in bomb.get("players", {}):
+                bombs.append({
+                    "code": bomb["code"], "language": bomb["language"], "status": bomb["status"],
+                    "players": len(bomb["players"]), "createdAt": bomb["createdAt"],
+                })
+        return bombs[:10]
 
     def create_context(self, user: dict, payload: dict):
         difficulty = payload.get("difficulty", "easy")

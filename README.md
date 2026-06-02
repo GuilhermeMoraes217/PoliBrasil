@@ -63,6 +63,7 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Login com Google via Firebase Authentication.
 - Duelo de tradução e duelo de palavras por sílaba.
 - Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
+- Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host e digitação ao vivo via Firebase Realtime Database.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
@@ -80,8 +81,7 @@ Para ampliar as sugestões offline português→inglês, o projeto também usa o
 2. Em **Project settings > Your apps**, crie ou abra um app Web.
 3. Copie a `apiKey` para `public/firebase-config.js`.
 4. Em **Authentication > Sign-in method**, habilite **Google**.
-5. Para permitir jogadores convidados durante o desenvolvimento, habilite também **Anonymous**.
-6. Em **Realtime Database > Rules**, publique o conteúdo de `firebase.rules.json`.
+5. Em **Realtime Database > Rules**, publique o conteúdo de `firebase.rules.json`.
 
 O banco configurado é:
 
@@ -96,13 +96,13 @@ https://poligbrasil-2022-default-rtdb.firebaseio.com/
 - `scripts/build_vocabulary.py`: fonte curada e gerador do vocabulário JSON.
 - `data/poli.db`: banco SQLite criado automaticamente pelo servidor.
 - `public/`: frontend HTML, CSS e JavaScript.
-- `firebase.rules.json`: bloqueia alterações diretas no Realtime Database.
+- `firebase.rules.json`: libera somente o texto temporário digitado no `Word Bomb`; estado competitivo permanece bloqueado.
 
 ## Arquitetura
 
 O Firebase Authentication identifica os jogadores. O Python valida o token Firebase e processa as ações competitivas. Ranking, histórico e salas ficam no SQLite do servidor.
 
-O navegador não grava mais partidas diretamente no Realtime Database. Isso impede que alguém altere XP, corações ou respostas pelo DevTools. Em uma implantação futura com múltiplas instâncias do backend, o SQLite pode ser substituído pelo Firebase Admin SDK ou por outro banco centralizado sem expor credenciais administrativas no navegador.
+O navegador não grava partidas diretamente no Realtime Database. Isso impede que alguém altere XP, corações ou respostas pelo DevTools. No `Word Bomb`, o Firebase transmite apenas o rascunho temporário de digitação do próprio usuário autenticado. Em uma implantação futura com múltiplas instâncias do backend, o SQLite pode ser substituído pelo Firebase Admin SDK ou por outro banco centralizado sem expor credenciais administrativas no navegador.
 
 ## Vocabulário
 

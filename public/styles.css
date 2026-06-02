@@ -63,6 +63,7 @@ h1 span { color: var(--green); }
 .button.ghost { border-color: var(--line); box-shadow: none; color: var(--muted); }
 .button.compact { font-size: 9px; padding: 9px 11px; }
 .button.wide { margin-top: 24px; width: 100%; }
+.button:disabled { cursor: not-allowed; opacity: .42; transform: none; }
 .terminal-card, .lobby-card, .arena-card { background: rgba(13,25,20,.93); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .window-bar { align-items: center; background: #14251f; border-bottom: 1px solid var(--line); color: var(--muted); display: flex; font-size: 10px; gap: 7px; padding: 10px; }
 .window-bar i { background: var(--muted); border-radius: 50%; height: 7px; width: 7px; }
@@ -76,12 +77,13 @@ h1 span { color: var(--green); }
 .cursor { animation: blink .8s steps(2) infinite; color: var(--green); }
 .section-heading { align-items: end; border-top: 1px solid var(--line); display: flex; justify-content: space-between; margin-top: 65px; padding-top: 35px; }
 .section-heading h2 { font-size: 19px; }.section-heading span { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
-.mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr); margin-top: 25px; }
+.mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); margin-top: 25px; }
 .mode-card { background: var(--panel); border: 1px solid var(--line); padding: 24px; position: relative; transition: .2s ease; }
 .mode-card:hover { background: var(--panel-2); transform: translateY(-5px); box-shadow: var(--shadow); }
 .mode-card::before { content: ""; height: 3px; left: 0; position: absolute; top: 0; width: 100%; }
 .mode-card.green::before { background: var(--green); }.mode-card.purple::before { background: var(--purple); }
 .mode-card.amber::before { background: #f4c95d; }.amber .pixel-icon, .amber .text-button { color: #f4c95d; }
+.mode-card.cyan::before { background: #67e8f9; }.cyan .pixel-icon, .cyan .text-button { color: #67e8f9; }
 .mode-top { color: var(--muted); display: flex; font-size: 10px; justify-content: space-between; letter-spacing: 2px; }
 .mode-top i { border: 1px solid var(--line); font-style: normal; padding: 4px 6px; }
 .pixel-icon { color: var(--green); font-family: "Press Start 2P"; font-size: 32px; margin: 42px 0 23px; }
@@ -167,6 +169,17 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 .context-open-rooms { margin-top: 18px; }.context-open-rooms p { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
 .context-room { align-items: center; background: #07110d; border: 1px solid var(--line); color: var(--cream); display: grid; font-size: 10px; gap: 8px; grid-template-columns: 1fr auto; margin-top: 8px; padding: 11px; text-align: left; width: 100%; }
 .context-room b { color: var(--green); }.context-room span { color: var(--muted); }
+.bomb-layout { display: grid; gap: 20px; grid-template-columns: 300px 1fr; margin-top: 44px; }
+.bomb-players { display: grid; gap: 9px; }
+.bomb-player { background: #07110d; border: 1px solid var(--line); display: grid; font-size: 10px; gap: 6px; grid-template-columns: 28px 1fr; padding: 12px; }
+.bomb-player.active { border-color: var(--green); box-shadow: 0 0 13px rgba(126,231,135,.18); }
+.bomb-player.out { opacity: .42; }.bomb-player b { overflow-wrap: anywhere; }.bomb-player span:not(.bomb-position) { color: var(--muted); grid-column: 2; }
+.bomb-player em { color: var(--green); font-size: 9px; font-style: normal; grid-column: 2; }.bomb-position { color: var(--purple); grid-row: 1 / 4; }
+.bomb-arena { padding: 36px; }.bomb-arena h2 { color: #67e8f9; text-transform: uppercase; }
+.bomb-live-typing { background: #07110d; border: 1px dashed var(--line); color: var(--green); font-family: "Press Start 2P"; font-size: 15px; min-height: 53px; overflow-wrap: anywhere; padding: 18px; }
+#bomb-form { display: flex; gap: 10px; margin-top: 18px; }
+.bomb-lobby-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+#bomb-invite { max-width: none; }
 .code-input { font-family: "Press Start 2P"; font-size: 25px; letter-spacing: 9px; text-align: center; text-transform: uppercase; }
 .toast { background: var(--green); bottom: 20px; color: #07110d; font-size: 11px; font-weight: 700; left: 50%; opacity: 0; padding: 12px 16px; position: fixed; transform: translate(-50%,15px); transition: .2s; z-index: 2147483647; }
 .toast.show { opacity: 1; transform: translate(-50%,0); }
@@ -175,11 +188,12 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135
 @keyframes hit { 30% { border-color: var(--danger); transform: translateX(-8px) } 60% { transform: translateX(6px) } }
 @keyframes gain { 35% { box-shadow: 0 0 24px rgba(126,231,135,.55); transform: translateY(-5px) } }
 @media (max-width: 760px) {
-  main { padding-top: 38px; }.hero { display: block; }.terminal-card { margin-top: 35px; }.mode-grid, .dashboard-grid, .context-layout { grid-template-columns: 1fr; }
+  main { padding-top: 38px; }.hero { display: block; }.terminal-card { margin-top: 35px; }.mode-grid, .dashboard-grid, .context-layout, .bomb-layout { grid-template-columns: 1fr; }
   .section-heading span { display: none; }.topbar-actions > span:not(.online-dot) { display: none; }.brand small { display: none; }
   .fighters { align-items: stretch; gap: 8px; }.fighter { display: block; min-width: 0; padding: 10px; width: 44%; }.fighter .avatar { margin-bottom: 10px; }
   .versus.big { align-self: center; font-size: 10px; }.hearts { font-size: 14px; letter-spacing: 1px; }
   .battle-top span:nth-child(2) { display: none; }.arena-card { padding: 24px 14px; }.timer { margin: -24px -14px 28px; }
   #answer-form { display: block; } #answer-form button { margin-top: 9px; width: 100%; }.room-code { font-size: 24px; letter-spacing: 7px; padding: 18px 10px; }
   #context-form { display: block; } #context-form button { margin-top: 9px; width: 100%; }
+  #bomb-form { display: block; } #bomb-form button { margin-top: 9px; width: 100%; } #bomb-invite { display: block; } #bomb-invite .button { display: inline-block; margin-top: 8px; }
 }

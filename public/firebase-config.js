@@ -1,5 +1,5 @@
 // Configuração Web App do projeto Firebase.
-// Ative Authentication > Google e, para testes locais, Authentication > Anonymous.
+// Ative Authentication > Google. O backend competitivo recusa tokens anonimos.
 window.POLI_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE",
   authDomain: "poligbrasil-2022.firebaseapp.com",

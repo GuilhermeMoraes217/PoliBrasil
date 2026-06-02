@@ -6,16 +6,25 @@ const ROUND_MS = 10000;
 const state = {
   auth: null,
   firebase: null,
+  database: null,
+  firebaseDatabase: null,
   user: null,
   profile: null,
   room: null,
   roomCode: null,
   context: null,
   contextPollTimer: null,
+  bomb: null,
+  bombPollTimer: null,
+  bombTimer: null,
+  bombTypingUnsubscribe: null,
+  bombTypingValue: "",
+  bombTypingByUid: {},
   pollTimer: null,
   rematchPollTimer: null,
   pendingRematch: null,
   pendingJoinCode: null,
+  pendingBombJoinCode: null,
   pollInFlight: false,
   timer: null,
   selectedMode: "translation",
@@ -33,7 +42,8 @@ const screens = {
   home: $("#home-screen"),
   lobby: $("#lobby-screen"),
   game: $("#game-screen"),
-  context: $("#context-screen")
+  context: $("#context-screen"),
+  bomb: $("#bomb-screen")
 };
 
 boot();
@@ -74,6 +84,15 @@ function bindInterface() {
   $("#join-context").addEventListener("click", joinContext);
   $("#leave-context").addEventListener("click", leaveContext);
   $("#context-form").addEventListener("submit", submitContextWord);
+  $("#open-bomb").addEventListener("click", openBombModal);
+  $("#create-bomb").addEventListener("click", createBomb);
+  $("#join-bomb").addEventListener("click", joinBomb);
+  $("#bomb-ready").addEventListener("click", toggleBombReady);
+  $("#bomb-start").addEventListener("click", startBombMatch);
+  $("#leave-bomb").addEventListener("click", leaveBomb);
+  $("#bomb-form").addEventListener("submit", submitBombAnswer);
+  $("#bomb-input").addEventListener("input", publishBombTyping);
+  $("#copy-bomb-invite").addEventListener("click", copyBombInvite);
   window.addEventListener("beforeunload", notifyLeaveOnUnload);
   renderMute();
 }
@@ -87,8 +106,11 @@ async function connectFirebase() {
   try {
     const appSdk = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
     const authSdk = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+    const databaseSdk = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js");
     const app = appSdk.initializeApp(config);
     state.firebase = authSdk;
+    state.firebaseDatabase = databaseSdk;
+    state.database = databaseSdk.getDatabase(app);
     state.auth = authSdk.getAuth(app);
     await new Promise((resolve) => authSdk.onAuthStateChanged(state.auth, async (user) => {
       state.user = user;
@@ -113,6 +135,7 @@ async function login() {
     renderIdentity();
     await loadDashboard();
     await completePendingJoin();
+    await completePendingBombJoin();
     toast("Login realizado");
   } catch (error) {
     console.error(error);
@@ -129,6 +152,7 @@ async function logout() {
   try {
     if (state.roomCode) await leaveAndGoHome();
     if (state.context) leaveContext();
+    if (state.bomb) await leaveBomb();
     await state.firebase.signOut(state.auth);
     state.user = null;
     state.profile = null;
@@ -364,6 +388,260 @@ function leaveContext() {
   $("#context-input").value = "";
   $("#context-suggestion").classList.add("hidden");
   showScreen("home");
+}
+
+async function openBombModal() {
+  if (!requireGoogleLogin()) return;
+  $("#bomb-modal").showModal();
+  await loadOpenBombs();
+}
+
+async function loadOpenBombs() {
+  const element = $("#bomb-open-rooms");
+  try {
+    const { bombs } = await api("/bombs");
+    element.innerHTML = bombs.length ? `
+      <p>// SUAS_SALAS_ABERTAS</p>
+      ${bombs.map((bomb) => `
+        <button class="context-room" type="button" data-bomb-code="${bomb.code}">
+          <b>#${bomb.code}</b>
+          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bomb.status.toUpperCase()}</span>
+        </button>
+      `).join("")}
+    ` : "";
+    element.querySelectorAll("[data-bomb-code]").forEach((button) => button.addEventListener("click", () => resumeBomb(button.dataset.bombCode)));
+  } catch {
+    element.innerHTML = "";
+  }
+}
+
+async function createBomb() {
+  try {
+    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value } });
+    $("#bomb-modal").close();
+    enterBomb(bomb);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function joinBomb() {
+  const code = $("#bomb-join-code").value.trim().toUpperCase();
+  if (code.length !== 6) return toast("Digite um código de 6 caracteres");
+  if (!state.demo && !isGoogleUser()) {
+    state.pendingBombJoinCode = code;
+    toast("Faça login com Google para entrar na sala");
+    return login();
+  }
+  try {
+    const { bomb } = await api(`/bombs/${code}/join`, { method: "POST", body: {} });
+    if ($("#bomb-modal").open) $("#bomb-modal").close();
+    enterBomb(bomb);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function resumeBomb(code) {
+  try {
+    const { bomb } = await api(`/bombs/${code}`);
+    $("#bomb-modal").close();
+    enterBomb(bomb);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function enterBomb(bomb) {
+  state.bomb = bomb;
+  syncRoomClock(bomb);
+  subscribeBombTyping();
+  renderBomb();
+  showScreen("bomb");
+  scheduleBombRefresh();
+}
+
+async function refreshBomb() {
+  if (!state.bomb) return;
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}`)).bomb;
+    syncRoomClock(state.bomb);
+    renderBomb();
+    scheduleBombRefresh();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function scheduleBombRefresh() {
+  clearTimeout(state.bombPollTimer);
+  if (!state.bomb) return;
+  state.bombPollTimer = setTimeout(refreshBomb, document.hidden ? 4000 : 800);
+}
+
+function renderBomb() {
+  const bomb = state.bomb;
+  if (!bomb) return;
+  const players = bomb.order.map((uid) => bomb.players[uid]).filter(Boolean);
+  const activePlayer = bomb.players[bomb.turn];
+  const me = bomb.players[state.user.uid];
+  const waiting = bomb.status === "waiting";
+  const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
+  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"}`;
+  $("#bomb-invite-link").textContent = bombInviteUrl();
+  $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
+  $("#bomb-players").innerHTML = players.map((player, index) => `
+    <div class="bomb-player ${player.uid === bomb.turn ? "active" : ""} ${player.hearts <= 0 ? "out" : ""}">
+      <span class="bomb-position">${String(index + 1).padStart(2, "0")}</span>
+      <b>${escapeHtml(player.name)}</b>
+      <span>${player.score || 0} XP · ${"♥".repeat(player.hearts || 0)}${"♡".repeat(3 - (player.hearts || 0))}</span>
+      <em>${player.ready ? "READY" : "WAITING"}</em>
+    </div>
+  `).join("");
+  $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
+  $("#bomb-prompt").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
+  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} está digitando ao vivo:`;
+  $("#bomb-input").disabled = !canAnswer;
+  $("#bomb-input").placeholder = canAnswer ? "digite_uma_palavra..." : "aguarde_seu_turno...";
+  $("#bomb-live-typing").textContent = state.bombTypingByUid[bomb.turn]?.value || "...";
+  $("#bomb-ready").classList.toggle("hidden", !waiting);
+  $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
+  const allReady = players.length >= 2 && players.every((player) => player.ready);
+  $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
+  $("#bomb-start").disabled = !allReady;
+  if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host já pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
+  if (bomb.lastFeedback) renderBombFeedback(bomb.lastFeedback);
+  if (bomb.status === "playing") {
+    startBombTimer();
+    if (canAnswer) focusInput("#bomb-input");
+  } else {
+    clearInterval(state.bombTimer);
+  }
+  if (bomb.status === "finished") renderBombFinished();
+}
+
+function renderBombFeedback(feedback) {
+  const element = $("#bomb-feedback");
+  const actor = state.bomb.players[feedback.uid]?.name || "PLAYER";
+  if (feedback.kind === "correct") {
+    element.textContent = `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
+    element.className = "feedback correct";
+  } else if (feedback.kind === "timeout") {
+    element.textContent = `${actor} perdeu um coração: tempo esgotado.`;
+    element.className = "feedback timeout";
+  } else {
+    element.textContent = "Palavra inválida. Corrija antes do tempo acabar.";
+    element.className = "feedback wrong";
+  }
+}
+
+function startBombTimer() {
+  clearInterval(state.bombTimer);
+  const tick = () => {
+    if (!state.bomb || state.bomb.status !== "playing") return;
+    const remaining = Math.min(ROUND_MS, Math.max(0, Number(state.bomb.deadline) - (Date.now() + state.serverOffset)));
+    $("#bomb-timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
+    $("#bomb-timer-number").textContent = Math.ceil(remaining / 1000);
+    if (remaining <= 0) refreshBomb();
+  };
+  tick();
+  state.bombTimer = setInterval(tick, 160);
+}
+
+async function toggleBombReady() {
+  try {
+    const ready = !state.bomb.players[state.user.uid]?.ready;
+    state.bomb = (await api(`/bombs/${state.bomb.code}/ready`, { method: "POST", body: { ready } })).bomb;
+    renderBomb();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function startBombMatch() {
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}/start`, { method: "POST", body: {} })).bomb;
+    syncRoomClock(state.bomb);
+    await clearBombTyping();
+    renderBomb();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function submitBombAnswer(event) {
+  event.preventDefault();
+  const input = $("#bomb-input");
+  const answer = input.value.trim();
+  if (!answer || input.disabled) return;
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}/answer`, { method: "POST", body: { answer, round: state.bomb.round } })).bomb;
+    input.value = "";
+    await clearBombTyping();
+    syncRoomClock(state.bomb);
+    renderBomb();
+  } catch (error) {
+    $("#bomb-feedback").textContent = error.message;
+    $("#bomb-feedback").className = "feedback wrong";
+    focusInput("#bomb-input");
+  }
+}
+
+function bombTypingRootRef() {
+  if (!state.database || !state.bomb) return null;
+  return state.firebaseDatabase.ref(state.database, `liveBombRooms/${state.bomb.code}/typing`);
+}
+
+function subscribeBombTyping() {
+  if (state.bombTypingUnsubscribe) state.bombTypingUnsubscribe();
+  const reference = bombTypingRootRef();
+  if (!reference) return;
+  state.bombTypingUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
+    state.bombTypingByUid = snapshot.val() || {};
+    const typing = state.bombTypingByUid[state.bomb?.turn] || {};
+    state.bombTypingValue = typing.value || "";
+    $("#bomb-live-typing").textContent = state.bombTypingValue || "...";
+  });
+}
+
+async function publishBombTyping() {
+  const root = bombTypingRootRef();
+  const reference = root && state.firebaseDatabase.child(root, state.user.uid);
+  if (!reference || state.bomb?.turn !== state.user?.uid) return;
+  await state.firebaseDatabase.set(reference, {
+    uid: state.user.uid,
+    value: $("#bomb-input").value.slice(0, 32),
+    updatedAt: Date.now()
+  });
+}
+
+async function clearBombTyping() {
+  const root = bombTypingRootRef();
+  const reference = root && state.firebaseDatabase.child(root, state.user.uid);
+  if (!reference) return;
+  try { await state.firebaseDatabase.remove(reference); } catch {}
+}
+
+function renderBombFinished() {
+  const winner = state.bomb.players[state.bomb.winner];
+  $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o WORD BOMB!` : "Partida encerrada.";
+  $("#bomb-feedback").className = "feedback correct";
+}
+
+async function leaveBomb() {
+  const bomb = state.bomb;
+  clearTimeout(state.bombPollTimer);
+  clearInterval(state.bombTimer);
+  if (state.bombTypingUnsubscribe) state.bombTypingUnsubscribe();
+  state.bombTypingUnsubscribe = null;
+  state.bomb = null;
+  $("#bomb-input").value = "";
+  $("#bomb-live-typing").textContent = "...";
+  showScreen("home");
+  if (bomb) {
+    try { await api(`/bombs/${bomb.code}/leave`, { method: "POST", body: {} }); } catch {}
+  }
+  await loadDashboard();
 }
 
 function startRoom(room) {
@@ -646,9 +924,15 @@ function requireGoogleLogin() {
 
 function openInvite() {
   const code = new URLSearchParams(location.search).get("room");
-  if (!code) return;
-  $("#join-code").value = code.toUpperCase();
-  $("#join-modal").showModal();
+  const bombCode = new URLSearchParams(location.search).get("bomb");
+  if (code) {
+    $("#join-code").value = code.toUpperCase();
+    $("#join-modal").showModal();
+  }
+  if (bombCode) {
+    $("#bomb-join-code").value = bombCode.toUpperCase();
+    $("#bomb-modal").showModal();
+  }
 }
 
 async function completePendingJoin() {
@@ -656,6 +940,13 @@ async function completePendingJoin() {
   $("#join-code").value = state.pendingJoinCode;
   state.pendingJoinCode = null;
   await joinRoom();
+}
+
+async function completePendingBombJoin() {
+  if (!state.pendingBombJoinCode || !isGoogleUser()) return;
+  $("#bomb-join-code").value = state.pendingBombJoinCode;
+  state.pendingBombJoinCode = null;
+  await joinBomb();
 }
 
 function inviteUrl() {
@@ -670,6 +961,15 @@ async function copyCode() {
 async function copyInvite() {
   await navigator.clipboard.writeText(inviteUrl());
   toast("Link de convite copiado");
+}
+
+function bombInviteUrl() {
+  return `${location.origin}${location.pathname}?bomb=${state.bomb?.code || "------"}`;
+}
+
+async function copyBombInvite() {
+  await navigator.clipboard.writeText(bombInviteUrl());
+  toast("Link do Word Bomb copiado");
 }
 
 function currentPlayer() {
@@ -749,6 +1049,14 @@ function toast(message) {
 }
 
 function notifyLeaveOnUnload() {
+  if (state.bomb && state.apiToken) {
+    fetch(`/api/bombs/${state.bomb.code}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.apiToken}` },
+      body: "{}",
+      keepalive: true
+    });
+  }
   if (!state.roomCode || !state.apiToken) return;
   fetch(`/api/rooms/${state.roomCode}/leave`, {
     method: "POST",

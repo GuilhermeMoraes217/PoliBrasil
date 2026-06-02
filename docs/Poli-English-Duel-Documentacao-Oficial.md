@@ -14,11 +14,12 @@
 
 O **Poli English Duel** é uma plataforma web gamificada para prática de inglês por falantes de português brasileiro. O produto combina partidas multiplayer, feedback pedagógico imediato, progressão por XP e uma identidade visual retrô inspirada em terminais de desenvolvimento.
 
-O objetivo central é transformar o estudo de vocabulário em sessões curtas e competitivas. Em vez de apresentar listas estáticas, o jogo oferece três experiências:
+O objetivo central é transformar o estudo de vocabulário em sessões curtas e competitivas. Em vez de apresentar listas estáticas, o jogo oferece quatro experiências:
 
 - **Translation Rush:** tradução entre inglês e português sob limite de tempo.
 - **Syllable Strike:** formação de palavras inglesas a partir de uma sílaba.
 - **Word Radar:** descoberta colaborativa e competitiva de uma palavra secreta por proximidade semântica pedagógica.
+- **Word Bomb:** loop multiplayer de palavras com trecho obrigatório, lobby e digitação ao vivo.
 
 O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio do Firebase Authentication e mantém o estado competitivo sob controle do backend Python. Ranking, histórico, salas e tentativas são persistidos em SQLite.
 
@@ -50,6 +51,7 @@ O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio 
 | Translation Rush | Tradução alternada EN → PT-BR e PT-BR → EN |
 | Syllable Strike | Resposta com palavra inglesa iniciada pela sílaba exibida |
 | Word Radar | Sala multiplayer persistente com tentativas compartilhadas |
+| Word Bomb | Sala multiplayer para até oito participantes com lobby, turnos e digitação ao vivo |
 | Progressão | Corações, XP, ranking global e histórico individual |
 | Feedback | Animações, sons opcionais, contador numérico e resposta correta após erro |
 | Conteúdo | Níveis, categorias, vocabulário curado e fallback FreeDict |
@@ -185,6 +187,28 @@ A distância considera:
 
 A fórmula prioriza relações pedagógicas explícitas da base curada. O fallback do dicionário amplia a cobertura, mas palavras sem metadados semânticos detalhados recebem uma aproximação mais simples.
 
+## 4.4 Word Bomb
+
+O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer pedagógicas em inglês ou português.
+
+### Regras
+
+- O host escolhe o idioma ao criar a sala.
+- Uma sala aceita até oito participantes.
+- Cada jogador marca seu estado como pronto no lobby.
+- A partida não começa automaticamente: somente o host pode iniciá-la, e o botão fica disponível quando todos estiverem prontos.
+- O backend apresenta um trecho obrigatório de duas letras e alterna os turnos entre os jogadores ativos.
+- A palavra enviada deve existir no dicionário, conter o trecho apresentado e ainda não ter sido utilizada na partida.
+- Uma resposta válida concede `100 XP` e passa o turno.
+- Uma resposta inválida pode ser corrigida enquanto ainda houver tempo.
+- Quando o cronômetro de dez segundos termina, o jogador perde um coração e o turno avança.
+- O último jogador com corações vence.
+- Durante o turno, todos os participantes visualizam a digitação do jogador ativo em tempo real.
+
+### Arquitetura híbrida
+
+O Python continua autoritativo para lobby, participantes, início, turnos, validação, vidas, encerramento, XP e histórico. O Firebase Realtime Database transporta apenas o rascunho temporário digitado pelo jogador ativo. Esse dado não concede pontos e não altera o resultado da partida.
+
 # 5. Gamificação
 
 ## 5.1 Corações
@@ -196,6 +220,7 @@ Nos duelos tradicionais, cada jogador começa com três corações. Uma resposta
 - Resposta correta em duelo tradicional: `100 XP`.
 - Word Radar: pontuação proporcional à proximidade.
 - Word Radar exato: pontos de proximidade mais bônus de `100 XP`.
+- Word Bomb: `100 XP` por palavra válida.
 - Encerramento de duelo tradicional: atualização de ranking e histórico.
 - Vitória em duelo tradicional: bônus adicional no cálculo persistido do ranking.
 
@@ -296,9 +321,11 @@ app.py / Flask / WSGI
   v
 server.py / regras autoritativas do jogo
   |
-  +--> SQLite: salas, Word Radar, ranking e histórico
+  +--> SQLite: salas, Word Radar, Word Bomb, ranking e histórico
   |
   +--> Firebase Identity Toolkit: validação do token do usuário
+  |
+  +--> Firebase Realtime Database: digitação temporária ao vivo do Word Bomb
 ```
 
 ## 7.2 Frontend
@@ -352,6 +379,7 @@ O arquivo `data/poli.db` é criado automaticamente e contém quatro tabelas.
 | --- | --- |
 | `rooms` | Estado serializado dos duelos Translation Rush e Syllable Strike |
 | `contexts` | Estado serializado das salas Word Radar |
+| `bombs` | Lobby e estado competitivo autoritativo das salas Word Bomb |
 | `rankings` | XP, vitórias, derrotas e partidas por usuário |
 | `history` | Histórico individual de duelos concluídos |
 
@@ -387,13 +415,23 @@ Credenciais administrativas, chaves privadas e `client secret` OAuth não são e
 
 ## 8.3 Realtime Database
 
-O Firebase Realtime Database foi configurado inicialmente, porém o navegador não grava o estado das partidas diretamente nele. As regras publicadas bloqueiam leitura e escrita:
+O Firebase Realtime Database não recebe estado competitivo. No Word Bomb, ele transmite somente a digitação temporária ao vivo. Cada usuário autenticado pode escrever ou apagar apenas o próprio rascunho, limitado a 32 caracteres:
 
 ```json
 {
   "rules": {
     ".read": false,
-    ".write": false
+    ".write": false,
+    "liveBombRooms": {
+      "$room": {
+        "typing": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    }
   }
 }
 ```
@@ -448,6 +486,19 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 | `POST` | `/api/contexts/<code>/suggest` | Obter sugestão PT-BR → EN |
 | `POST` | `/api/contexts/<code>/guess` | Enviar tentativa inglesa |
 
+## 9.4 Endpoints autenticados do Word Bomb
+
+| Método | Endpoint | Finalidade |
+| --- | --- | --- |
+| `POST` | `/api/bombs` | Criar sala e escolher idioma |
+| `GET` | `/api/bombs` | Listar salas abertas do usuário |
+| `GET` | `/api/bombs/<code>` | Consultar lobby ou partida |
+| `POST` | `/api/bombs/<code>/join` | Entrar na sala |
+| `POST` | `/api/bombs/<code>/ready` | Confirmar ou cancelar estado pronto |
+| `POST` | `/api/bombs/<code>/start` | Iniciar partida como host |
+| `POST` | `/api/bombs/<code>/answer` | Enviar palavra do turno |
+| `POST` | `/api/bombs/<code>/leave` | Sair da sala |
+
 # 10. Estrutura do repositório
 
 | Caminho | Descrição |
@@ -467,7 +518,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 | `scripts/fetch_freedict_dictionary.py` | Processamento FreeDict |
 | `tests/test_game.py` | Testes do motor |
 | `tests/test_wsgi.py` | Testes da entrada Flask |
-| `firebase.rules.json` | Regras restritivas do Realtime Database |
+| `firebase.rules.json` | Regras restritivas com exceção do rascunho temporário do Word Bomb |
 
 # 11. Implantação no PythonAnywhere
 

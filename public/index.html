@@ -57,7 +57,7 @@
 
         <div class="section-heading">
           <div><p class="eyebrow">// SELECT_GAME_MODE</p><h2>ESCOLHA SEU DESAFIO</h2></div>
-          <span>3 MODOS DISPONÍVEIS</span>
+          <span>4 MODOS DISPONÍVEIS</span>
         </div>
         <div class="mode-grid">
           <article class="mode-card green">
@@ -80,6 +80,13 @@
             <h3>WORD<br>RADAR</h3>
             <p>Descubra a palavra secreta em inglês por aproximação. Use português quando precisar aprender uma tradução.</p>
             <button id="open-context" class="text-button">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+          <article class="mode-card cyan">
+            <div class="mode-top"><span>MODE_04</span><i>LIVE</i></div>
+            <div class="pixel-icon">BO<span>_</span>MB</div>
+            <h3>WORD<br>BOMB</h3>
+            <p>Entre no loop, fique pronto e responda palavras com o trecho exibido antes que o tempo acabe.</p>
+            <button id="open-bomb" class="text-button">JOGAR ESTE MODO <b>→</b></button>
           </article>
         </div>
         <div class="dashboard-grid">
@@ -176,6 +183,41 @@
           </div>
         </div>
       </section>
+
+      <section id="bomb-screen" class="screen">
+        <div class="battle-top">
+          <button class="back-button" id="leave-bomb">← voltar_ao_menu</button>
+          <span>WORD_BOMB · MULTIPLAYER</span>
+          <span id="bomb-meta">ROOM #------ · ENGLISH</span>
+        </div>
+        <div class="bomb-layout">
+          <section class="dashboard-card bomb-players-panel">
+            <p class="eyebrow">// PLAYERS_LOOP</p>
+            <div id="bomb-players" class="bomb-players"></div>
+          </section>
+          <section class="arena-card bomb-arena">
+            <div id="bomb-timer" class="timer"><i id="bomb-timer-bar"></i><b id="bomb-timer-number">10</b></div>
+            <p id="bomb-phase" class="eyebrow">// WAITING_FOR_PLAYERS</p>
+            <h2 id="bomb-prompt">READY?</h2>
+            <p id="bomb-live-label" class="prompt-hint">Todos conseguem acompanhar o turno ao vivo.</p>
+            <div id="bomb-live-typing" class="bomb-live-typing">...</div>
+            <div id="bomb-invite" class="invite-box">
+              <span id="bomb-invite-link">https://.../?bomb=------</span>
+              <button id="copy-bomb-invite" class="button secondary compact" type="button">COPIAR LINK</button>
+              <a id="bomb-whatsapp-invite" class="button whatsapp compact" target="_blank" rel="noopener">WHATSAPP</a>
+            </div>
+            <form id="bomb-form">
+              <input id="bomb-input" autocomplete="off" placeholder="aguarde_seu_turno..." maxlength="32">
+              <button class="button primary" type="submit">ENVIAR ↵</button>
+            </form>
+            <p id="bomb-feedback" class="feedback">Marque pronto e aguarde o host iniciar.</p>
+            <div class="bomb-lobby-actions">
+              <button id="bomb-ready" class="button secondary">ESTOU PRONTO</button>
+              <button id="bomb-start" class="button primary">INICIAR PARTIDA</button>
+            </div>
+          </section>
+        </div>
+      </section>
     </main>
 
     <dialog id="create-modal" class="modal">
@@ -239,6 +281,24 @@
       <div class="context-join">
         <input id="context-join-code" class="code-input" placeholder="ABC123" maxlength="6">
         <button id="join-context" class="button secondary" type="button">ENTRAR</button>
+      </div>
+    </dialog>
+
+    <dialog id="bomb-modal" class="modal">
+      <button class="close-modal" aria-label="Fechar">×</button>
+      <p class="eyebrow">// START_WORD_BOMB</p>
+      <h2>WORD BOMB</h2>
+      <label>IDIOMA DAS PALAVRAS</label>
+      <select id="bomb-language" class="category-choice">
+        <option value="en">INGLÊS</option>
+        <option value="pt">PORTUGUÊS</option>
+      </select>
+      <button id="create-bomb" class="button primary wide">CRIAR NOVA SALA</button>
+      <div id="bomb-open-rooms" class="context-open-rooms"></div>
+      <label for="bomb-join-code">OU ENTRE EM UMA SALA</label>
+      <div class="context-join">
+        <input id="bomb-join-code" class="code-input" placeholder="ABC123" maxlength="6">
+        <button id="join-bomb" class="button secondary" type="button">ENTRAR</button>
       </div>
     </dialog>
 

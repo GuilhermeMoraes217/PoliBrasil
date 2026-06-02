@@ -100,6 +100,35 @@ class WsgiAppTest(unittest.TestCase):
         self.assertIn("serverNow", accepted.json["room"])
         self.assertEqual(requester_updates.json["activeRooms"][0]["code"], "REMAT1")
 
+    def test_word_bomb_host_can_start_only_after_everyone_is_ready(self):
+        with patch.object(server, "ALLOW_DEMO", True):
+            created = self.client.post(
+                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "en"}
+            )
+            code = created.json["bomb"]["code"]
+            joined = self.client.post(
+                f"/api/bombs/{code}/join", headers={"Authorization": "Bearer demo-two"}, json={}
+            )
+            blocked = self.client.post(
+                f"/api/bombs/{code}/start", headers={"Authorization": "Bearer demo-one"}, json={}
+            )
+            self.client.post(
+                f"/api/bombs/{code}/ready", headers={"Authorization": "Bearer demo-one"}, json={"ready": True}
+            )
+            self.client.post(
+                f"/api/bombs/{code}/ready", headers={"Authorization": "Bearer demo-two"}, json={"ready": True}
+            )
+            started = self.client.post(
+                f"/api/bombs/{code}/start", headers={"Authorization": "Bearer demo-one"}, json={}
+            )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(joined.status_code, 200)
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(started.status_code, 200)
+        self.assertEqual(started.json["bomb"]["status"], "playing")
+        self.assertIn(started.json["bomb"]["turn"], {"demo-one", "demo-two"})
+        self.assertIn("serverNow", started.json["bomb"])
+
 
 if __name__ == "__main__":
     unittest.main()

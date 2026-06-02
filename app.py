@@ -81,6 +81,20 @@ def contexts():
     return jsonify({"contexts": handler.get_open_contexts(user["uid"])}) if user else handler.response
 
 
+@app.get("/api/bombs")
+def bombs():
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    return jsonify({"bombs": handler.get_open_bombs(user["uid"])}) if user else handler.response
+
+
+@app.get("/api/bombs/<code>")
+def get_bomb(code):
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    return handler.get_bomb(code.upper(), user) if user else handler.response
+
+
 @app.get("/api/contexts/<code>")
 def get_context(code):
     handler = FlaskPoliHandler()
@@ -107,6 +121,24 @@ def create_context():
     handler = FlaskPoliHandler()
     user = handler.require_user()
     return handler.create_context(user, request.get_json(silent=True) or {}) if user else handler.response
+
+
+@app.post("/api/bombs")
+def create_bomb():
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    return handler.create_bomb(user, request.get_json(silent=True) or {}) if user else handler.response
+
+
+@app.post("/api/bombs/<code>/<action>")
+def bomb_action(code, action):
+    if not re.fullmatch(r"(join|ready|start|answer|leave)", action):
+        return jsonify({"error": "Endpoint not found"}), 404
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    if not user:
+        return handler.response
+    return getattr(handler, f"{action}_bomb")(code.upper(), user, request.get_json(silent=True) or {})
 
 
 @app.post("/api/contexts/<code>/<action>")

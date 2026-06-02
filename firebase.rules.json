@@ -5,6 +5,17 @@
     "rooms": {
       ".read": false,
       ".write": false
+    },
+    "liveBombRooms": {
+      "$room": {
+        "typing": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'value', 'updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('value').isString() && newData.child('value').val().length <= 32 && newData.child('updatedAt').isNumber())"
+          }
+        }
+      }
     }
   }
 }
