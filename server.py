@@ -248,6 +248,7 @@ def next_round(room: dict, database: sqlite3.Connection | None = None) -> dict:
 
 def public_room(room: dict) -> dict:
     public = json.loads(json.dumps(room))
+    public["serverNow"] = now_ms()
     if "prompt" in public:
         public["prompt"].pop("answers", None)
     return public
@@ -365,6 +366,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
         if path == "/api/profile":
             user = self.require_user()
             return self.send_json({"profile": self.get_profile(user)}) if user else None
+        if path == "/api/rematches":
+            user = self.require_user()
+            return self.send_json({
+                "rematches": self.get_pending_rematches(user["uid"]),
+                "activeRooms": self.get_active_rooms(user["uid"]),
+            }) if user else None
         if path == "/api/history":
             user = self.require_user()
             return self.send_json({"history": self.get_history(user["uid"])}) if user else None
@@ -546,11 +553,19 @@ class PoliHandler(SimpleHTTPRequestHandler):
         return self.send_json({"ok": True})
 
     def rematch_room(self, code: str, user: dict, payload: dict):
-        del payload
+        decision = payload.get("decision", "request")
+        if decision not in {"request", "accept", "decline"}:
+            return self.send_json({"error": "Ação de revanche inválida"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             room = read_room(database, code)
             if not room or user["uid"] not in room["players"]:
                 return self.send_json({"error": "Sala não encontrada"}, status=404)
+            if room["status"] != "finished":
+                return self.send_json({"error": "A revanche só pode ser solicitada após a partida"}, status=409)
+            if decision == "decline":
+                room["rematch"] = {}
+                write_room(database, room)
+                return self.send_json({"room": public_room(room)})
             room.setdefault("rematch", {})[user["uid"]] = True
             if room["status"] == "finished" and len(room["rematch"]) == len(room["players"]):
                 room.update({"status": "playing", "round": 0, "usedWords": {}, "usedPrompts": [], "rematch": {}, "winner": None, "finishReason": None, "lastFeedback": None})
@@ -559,6 +574,32 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 room = next_round(room, database)
             write_room(database, room)
         return self.send_json({"room": public_room(room)})
+
+    def get_pending_rematches(self, uid: str):
+        with closing(connect_db()) as database, database:
+            rows = database.execute("SELECT payload FROM rooms ORDER BY updated_at DESC").fetchall()
+        rematches = []
+        for row in rows:
+            room = json.loads(row["payload"])
+            requests = room.get("rematch", {})
+            if room.get("status") != "finished" or uid not in room.get("players", {}) or requests.get(uid):
+                continue
+            requester_uid = next((player_uid for player_uid in requests if player_uid != uid), None)
+            if requester_uid:
+                rematches.append({
+                    "code": room["code"], "mode": room["mode"], "requester": room["players"][requester_uid]["name"],
+                })
+        return rematches[:1]
+
+    def get_active_rooms(self, uid: str):
+        with closing(connect_db()) as database, database:
+            rows = database.execute("SELECT payload FROM rooms ORDER BY updated_at DESC").fetchall()
+        rooms = []
+        for row in rows:
+            room = json.loads(row["payload"])
+            if room.get("status") == "playing" and uid in room.get("players", {}):
+                rooms.append(public_room(room))
+        return rooms[:1]
 
     def get_ranking(self):
         with closing(connect_db()) as database, database:

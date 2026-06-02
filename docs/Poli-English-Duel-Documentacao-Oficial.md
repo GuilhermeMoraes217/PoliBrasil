@@ -46,7 +46,7 @@ O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio 
 | Autenticação | Login e logout com Google via Firebase Authentication |
 | Identidade | Nome, UID, foto do usuário autenticado, faixa e nível |
 | Multiplayer | Criação de salas, entrada por código e atualização periódica do estado |
-| Convites | Link copiável e compartilhamento pelo WhatsApp |
+| Convites | Link copiável, compartilhamento pelo WhatsApp e retomada da entrada após login |
 | Translation Rush | Tradução alternada EN → PT-BR e PT-BR → EN |
 | Syllable Strike | Resposta com palavra inglesa iniciada pela sílaba exibida |
 | Word Radar | Sala multiplayer persistente com tentativas compartilhadas |
@@ -88,7 +88,7 @@ O projeto utiliza estética retrô inspirada em terminal e ferramentas de desenv
 5. Nos duelos tradicionais, escolhe dificuldade e categoria.
 6. O sistema cria uma sala com código de seis caracteres.
 7. O link pode ser copiado ou compartilhado via WhatsApp.
-8. O segundo jogador entra utilizando o código ou link.
+8. O segundo jogador entra utilizando o código ou link. Ao abrir um link sem login, visualiza a sala, autentica-se com Google e segue automaticamente para a entrada.
 9. O backend controla rodadas, respostas, pontuação e encerramento.
 10. Ao final, o placar completo é exibido e a partida é registrada.
 
@@ -108,6 +108,7 @@ O **Translation Rush** é um duelo por turnos com limite de dez segundos por rod
 - A partida termina quando um jogador perde os três corações.
 - Não há repetição de palavra na mesma partida.
 - Se o conteúdo disponível para o filtro escolhido acabar, a partida é encerrada por esgotamento de conteúdo.
+- A barra e o contador do frontend são sincronizados com o relógio informado pelo backend.
 
 ### Exemplo
 
@@ -222,6 +223,10 @@ Dados demonstrativos não entram no ranking nem no histórico.
 ## 5.5 Áudio
 
 O jogo possui efeitos sonoros opcionais gerados no navegador. O estado de áudio é salvo localmente no browser por meio de `localStorage`.
+
+## 5.6 Revanche
+
+Após um duelo tradicional, um jogador pode solicitar uma revanche. O oponente recebe um modal explícito para aceitar ou recusar, tanto na tela final quanto no menu inicial. Se aceitar depois de o solicitante retornar ao menu, o polling retoma a sala reaberta automaticamente para os dois jogadores.
 
 # 6. Conteúdo pedagógico
 
@@ -430,6 +435,7 @@ No Word Radar, a palavra secreta não é enviada ao frontend enquanto a partida 
 | `POST` | `/api/rooms/<code>/leave` | Abandonar sala |
 | `POST` | `/api/rooms/<code>/rematch` | Solicitar revanche |
 | `GET` | `/api/history` | Consultar histórico pessoal |
+| `GET` | `/api/rematches` | Consultar convites de revanche e salas reabertas |
 
 ## 9.3 Endpoints autenticados do Word Radar
 

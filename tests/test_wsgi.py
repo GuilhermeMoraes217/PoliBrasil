@@ -74,6 +74,32 @@ class WsgiAppTest(unittest.TestCase):
         self.assertEqual(response.json["profile"]["progression"]["tier"], "beginner")
         self.assertEqual(response.json["profile"]["progression"]["level"], 1)
 
+    def test_rematch_invite_can_be_accepted_after_finished_match(self):
+        room = {
+            "code": "REMAT1", "mode": "translation", "difficulty": "easy", "category": "all",
+            "status": "finished", "round": 4, "players": {
+                "demo-one": {"uid": "demo-one", "name": "PLAYER_ONE", "photo": "", "hearts": 2, "score": 200},
+                "demo-two": {"uid": "demo-two", "name": "PLAYER_TWO", "photo": "", "hearts": 0, "score": 100},
+            },
+        }
+        with server.closing(server.connect_db()) as database, database:
+            server.write_room(database, room)
+        with patch.object(server, "ALLOW_DEMO", True):
+            requested = self.client.post(
+                "/api/rooms/REMAT1/rematch", headers={"Authorization": "Bearer demo-one"}, json={"decision": "request"}
+            )
+            updates = self.client.get("/api/rematches", headers={"Authorization": "Bearer demo-two"})
+            accepted = self.client.post(
+                "/api/rooms/REMAT1/rematch", headers={"Authorization": "Bearer demo-two"}, json={"decision": "accept"}
+            )
+            requester_updates = self.client.get("/api/rematches", headers={"Authorization": "Bearer demo-one"})
+        self.assertEqual(requested.status_code, 200)
+        self.assertEqual(updates.json["rematches"][0]["requester"], "PLAYER_ONE")
+        self.assertEqual(accepted.json["room"]["status"], "playing")
+        self.assertEqual(accepted.json["room"]["round"], 1)
+        self.assertIn("serverNow", accepted.json["room"])
+        self.assertEqual(requester_updates.json["activeRooms"][0]["code"], "REMAT1")
+
 
 if __name__ == "__main__":
     unittest.main()

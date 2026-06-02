@@ -57,6 +57,16 @@ def profile():
     return jsonify({"profile": handler.get_profile(user)}) if user else handler.response
 
 
+@app.get("/api/rematches")
+def rematches():
+    handler = FlaskPoliHandler()
+    user = handler.require_user()
+    return jsonify({
+        "rematches": handler.get_pending_rematches(user["uid"]),
+        "activeRooms": handler.get_active_rooms(user["uid"]),
+    }) if user else handler.response
+
+
 @app.get("/api/history")
 def history():
     handler = FlaskPoliHandler()

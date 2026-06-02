@@ -128,6 +128,7 @@ input { background: #07110d; border: 1px solid var(--line); color: var(--cream);
 input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(126,231,135,.1); }
 .feedback { color: var(--muted); font-size: 12px; min-height: 18px; }
 .modal { background: var(--panel); border: 1px solid var(--line); box-shadow: 10px 10px 0 rgba(0,0,0,.5); color: var(--cream); max-width: 460px; padding: 28px; width: calc(100% - 32px); }
+.modal .button + .button { margin-top: 11px; }
 .modal::backdrop { background: rgba(1,6,4,.78); backdrop-filter: blur(4px); }.modal h2 { font-size: 20px; margin-bottom: 25px; }
 .modal label { color: var(--muted); display: block; font-size: 10px; letter-spacing: 2px; margin: 15px 0 10px; }
 .close-modal { background: transparent; border: 0; color: var(--muted); float: right; font-size: 25px; }

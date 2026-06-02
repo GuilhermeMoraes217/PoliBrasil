@@ -1,6 +1,7 @@
 const config = window.POLI_FIREBASE_CONFIG || {};
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const ROUND_MS = 10000;
 
 const state = {
   auth: null,
@@ -12,6 +13,9 @@ const state = {
   context: null,
   contextPollTimer: null,
   pollTimer: null,
+  rematchPollTimer: null,
+  pendingRematch: null,
+  pendingJoinCode: null,
   pollInFlight: false,
   timer: null,
   selectedMode: "translation",
@@ -19,6 +23,7 @@ const state = {
   selectedCategory: "all",
   lastRound: -1,
   lastFeedback: null,
+  serverOffset: 0,
   muted: localStorage.getItem("poli-muted") === "true",
   apiToken: null,
   demo: !config.apiKey || new URLSearchParams(location.search).has("demo")
@@ -39,6 +44,7 @@ async function boot() {
   renderIdentity();
   await loadDashboard();
   openInvite();
+  scheduleRematchRefresh();
 }
 
 function bindInterface() {
@@ -60,6 +66,8 @@ function bindInterface() {
   $("#copy-invite").addEventListener("click", copyInvite);
   $("#mute-button").addEventListener("click", toggleMute);
   $("#rematch-button").addEventListener("click", requestRematch);
+  $("#accept-rematch").addEventListener("click", acceptRematch);
+  $("#decline-rematch").addEventListener("click", declineRematch);
   $("#finish-home").addEventListener("click", leaveAndGoHome);
   $("#open-context").addEventListener("click", openContextModal);
   $("#start-context").addEventListener("click", startContext);
@@ -104,6 +112,7 @@ async function login() {
     state.user = state.auth.currentUser;
     renderIdentity();
     await loadDashboard();
+    await completePendingJoin();
     toast("Login realizado");
   } catch (error) {
     console.error(error);
@@ -191,6 +200,11 @@ async function createRoom() {
 async function joinRoom() {
   const code = $("#join-code").value.trim().toUpperCase();
   if (code.length !== 6) return toast("Digite um código de 6 caracteres");
+  if (!state.demo && !isGoogleUser()) {
+    state.pendingJoinCode = code;
+    toast("Faça login com Google para entrar na sala");
+    return login();
+  }
   try {
     const { room } = await api(`/rooms/${code}/join`, { method: "POST", body: {} });
     $("#join-modal").close();
@@ -354,9 +368,12 @@ function leaveContext() {
 
 function startRoom(room) {
   state.room = room;
+  syncRoomClock(room);
   state.roomCode = room.code;
   state.lastRound = -1;
   state.lastFeedback = null;
+  state.pendingRematch = null;
+  if ($("#rematch-invite-modal").open) $("#rematch-invite-modal").close();
   renderRoom();
   scheduleRoomRefresh();
 }
@@ -367,6 +384,7 @@ async function refreshRoom() {
   let keepPolling = true;
   try {
     state.room = (await api(`/rooms/${state.roomCode}`)).room;
+    syncRoomClock(state.room);
     renderRoom();
   } catch (error) {
     clearTimeout(state.pollTimer);
@@ -387,6 +405,7 @@ function scheduleRoomRefresh() {
 
 function renderRoom() {
   if (!state.room) return;
+  syncRoomClock(state.room);
   if (state.room.status === "waiting") {
     renderLobby();
     showScreen("lobby");
@@ -448,6 +467,10 @@ function renderFinished(room) {
   `).join("");
   $("#rematch-button").textContent = room.rematch?.[state.user.uid] ? "AGUARDANDO OPONENTE..." : "PEDIR REVANCHE";
   if (!$("#finish-modal").open) $("#finish-modal").showModal();
+  const requester = Object.keys(room.rematch || {}).find((uid) => uid !== state.user.uid);
+  if (requester && !room.rematch?.[state.user.uid]) {
+    showRematchInvite({ code: room.code, mode: room.mode, requester: room.players[requester].name });
+  }
 }
 
 function renderFighter(prefix, player, fallback) {
@@ -473,8 +496,8 @@ function startTimer() {
   clearInterval(state.timer);
   const tick = () => {
     if (!state.room || state.room.status !== "playing") return;
-    const remaining = Math.max(0, state.room.deadline - Date.now());
-    $("#timer-bar").style.width = `${(remaining / 10000) * 100}%`;
+    const remaining = Math.min(ROUND_MS, Math.max(0, Number(state.room.deadline) - (Date.now() + state.serverOffset)));
+    $("#timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
     $("#timer-number").textContent = Math.ceil(remaining / 1000);
     if (remaining <= 0) refreshRoom();
   };
@@ -498,12 +521,16 @@ async function submitAnswer(event) {
 
 async function requestRematch() {
   try {
-    state.room = (await api(`/rooms/${state.roomCode}/rematch`, { method: "POST", body: {} })).room;
-    $("#finish-modal").close();
+    state.room = (await api(`/rooms/${state.roomCode}/rematch`, { method: "POST", body: { decision: "request" } })).room;
     renderRoom();
+    toast("Convite de revanche enviado");
   } catch (error) {
     toast(error.message);
   }
+}
+
+function syncRoomClock(room) {
+  if (room?.serverNow) state.serverOffset = Number(room.serverNow) - Date.now();
 }
 
 async function leaveAndGoHome() {
@@ -537,6 +564,60 @@ async function loadDashboard() {
   }
 }
 
+async function refreshRematches() {
+  clearTimeout(state.rematchPollTimer);
+  if (!isGoogleUser()) return scheduleRematchRefresh();
+  try {
+    const { rematches, activeRooms } = await api("/rematches");
+    if (!state.roomCode && activeRooms.length) return startRoom(activeRooms[0]);
+    if (rematches.length) showRematchInvite(rematches[0]);
+  } catch (error) {
+    console.error(error);
+  }
+  scheduleRematchRefresh();
+}
+
+function scheduleRematchRefresh() {
+  clearTimeout(state.rematchPollTimer);
+  state.rematchPollTimer = setTimeout(refreshRematches, document.hidden ? 8000 : 3000);
+}
+
+function showRematchInvite(rematch) {
+  if (state.pendingRematch?.code === rematch.code && $("#rematch-invite-modal").open) return;
+  state.pendingRematch = rematch;
+  $("#rematch-invite-text").textContent = `${rematch.requester} quer jogar ${modeLabel(rematch.mode)} novamente.`;
+  if (!$("#rematch-invite-modal").open) $("#rematch-invite-modal").showModal();
+}
+
+async function acceptRematch() {
+  if (!state.pendingRematch) return;
+  try {
+    const { room } = await api(`/rooms/${state.pendingRematch.code}/rematch`, { method: "POST", body: { decision: "accept" } });
+    $("#rematch-invite-modal").close();
+    if ($("#finish-modal").open) $("#finish-modal").close();
+    startRoom(room);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function declineRematch() {
+  if (!state.pendingRematch) return;
+  try {
+    const { room } = await api(`/rooms/${state.pendingRematch.code}/rematch`, { method: "POST", body: { decision: "decline" } });
+    if (state.roomCode === room.code) state.room = room;
+    state.pendingRematch = null;
+    $("#rematch-invite-modal").close();
+    toast("Convite de revanche recusado");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function modeLabel(mode) {
+  return mode === "translation" ? "Translation Rush" : "Syllable Strike";
+}
+
 function renderRanking(ranking) {
   $("#ranking-list").innerHTML = ranking.length ? ranking.map((player, index) => `
     <li><b>#${index + 1}</b><span>${escapeHtml(player.name)} <small>${escapeHtml(levelLabel(player.progression))}</small></span><em>${player.xp} XP</em></li>
@@ -566,9 +647,15 @@ function requireGoogleLogin() {
 function openInvite() {
   const code = new URLSearchParams(location.search).get("room");
   if (!code) return;
-  if (!requireGoogleLogin()) return;
   $("#join-code").value = code.toUpperCase();
   $("#join-modal").showModal();
+}
+
+async function completePendingJoin() {
+  if (!state.pendingJoinCode || !isGoogleUser()) return;
+  $("#join-code").value = state.pendingJoinCode;
+  state.pendingJoinCode = null;
+  await joinRoom();
 }
 
 function inviteUrl() {

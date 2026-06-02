@@ -35,6 +35,12 @@ class GameEngineTest(unittest.TestCase):
         self.assertNotIn("answers", server.public_room(room)["prompt"])
         self.assertIn("answers", room["prompt"])
 
+    def test_public_room_includes_server_clock_for_timer_sync(self):
+        room = self.room()
+        public = server.public_room(room)
+        self.assertIn("serverNow", public)
+        self.assertLess(abs(server.now_ms() - public["serverNow"]), 1000)
+
     def test_wrong_answer_reveals_correct_answer_after_attempt(self):
         room = self.room()
         expected = room["prompt"]["answers"][0]
