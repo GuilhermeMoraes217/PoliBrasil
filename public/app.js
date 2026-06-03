@@ -715,7 +715,7 @@ function renderBombAnswerLog() {
 function bombLogLabel(entry) {
   if (entry.kind === "correct") return "OK";
   if (entry.kind === "duplicate") return "REP";
-  if (entry.kind === "missing_syllable") return "SIL";
+  if (entry.kind === "missing_syllable") return "REQ";
   return "ERR";
 }
 
