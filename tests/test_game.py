@@ -17,23 +17,20 @@ class GameEngineTest(unittest.TestCase):
         self.player_one = {"uid": "one", "name": "PLAYER_ONE", "photo": "", "hearts": 3, "score": 0}
         self.player_two = {"uid": "two", "name": "PLAYER_TWO", "photo": "", "hearts": 3, "score": 0}
         self.remote_bomb_vocabulary = server.REMOTE_BOMB_VOCABULARY
-        self.google_translate_api_key = server.GOOGLE_TRANSLATE_API_KEY
-        self.google_word_fallback = server.GOOGLE_WORD_FALLBACK
+        self.free_word_fallback = server.FREE_WORD_FALLBACK
         self.firebase_database_auth = server.FIREBASE_DATABASE_AUTH
         server.REMOTE_BOMB_VOCABULARY = False
         server.REMOTE_BOMB_CACHE.clear()
-        server.GOOGLE_TRANSLATE_API_KEY = ""
-        server.GOOGLE_WORD_FALLBACK = True
-        server.GOOGLE_WORD_CACHE.clear()
+        server.FREE_WORD_FALLBACK = True
+        server.FREE_WORD_CACHE.clear()
         server.FIREBASE_DATABASE_AUTH = ""
 
     def tearDown(self):
         server.REMOTE_BOMB_VOCABULARY = self.remote_bomb_vocabulary
-        server.GOOGLE_TRANSLATE_API_KEY = self.google_translate_api_key
-        server.GOOGLE_WORD_FALLBACK = self.google_word_fallback
+        server.FREE_WORD_FALLBACK = self.free_word_fallback
         server.FIREBASE_DATABASE_AUTH = self.firebase_database_auth
         server.REMOTE_BOMB_CACHE.clear()
-        server.GOOGLE_WORD_CACHE.clear()
+        server.FREE_WORD_CACHE.clear()
         for suffix in ("", "-shm", "-wal"):
             database_file = Path(f"{server.DATABASE}{suffix}")
             if database_file.exists():
@@ -431,40 +428,42 @@ class GameEngineTest(unittest.TestCase):
         with patch("server.urllib.request.urlopen", return_value=response):
             self.assertTrue(server.bomb_word_exists("pt", "poliglota"))
 
-    def test_word_bomb_google_fallback_validates_and_caches_new_word_in_firebase(self):
+    def test_word_bomb_free_fallback_validates_and_caches_new_word_in_firebase(self):
         server.REMOTE_BOMB_VOCABULARY = True
         server.REMOTE_BOMB_CACHE[("pt", "no")] = set()
-        server.GOOGLE_TRANSLATE_API_KEY = "test-google-key"
-        google_response = io.BytesIO(json.dumps({
-            "data": {
-                "translations": [{
-                    "detectedSourceLanguage": "pt",
-                    "translatedText": "new word",
-                }]
+        dictionary_response = io.BytesIO(json.dumps({
+            "query": {
+                "pages": {
+                    "123": {
+                        "title": "novapalavra",
+                        "extract": "==Português==\nSubstantivo\nPalavra de teste.",
+                    }
+                }
             }
         }).encode())
         firebase_response = io.BytesIO(b"true")
-        with patch("server.urllib.request.urlopen", side_effect=[google_response, firebase_response]) as urlopen:
+        with patch("server.urllib.request.urlopen", side_effect=[dictionary_response, firebase_response]) as urlopen:
             self.assertTrue(server.bomb_word_exists("pt", "novapalavra"))
         requests = [call.args[0] for call in urlopen.call_args_list]
-        self.assertEqual(requests[0].get_method(), "POST")
-        self.assertIn("translation.googleapis.com/language/translate/v2", requests[0].full_url)
+        self.assertEqual(requests[0].get_method(), "GET")
+        self.assertIn("pt.wiktionary.org/w/api.php", requests[0].full_url)
         self.assertEqual(requests[1].get_method(), "PUT")
         self.assertIn("/bombVocabulary/chunks/pt/no/novapalavra.json", requests[1].full_url)
         self.assertIn("novapalavra", server.REMOTE_BOMB_CACHE[("pt", "no")])
 
-    def test_word_bomb_google_fallback_rejects_unchanged_translation(self):
+    def test_word_bomb_free_fallback_rejects_missing_dictionary_page(self):
         server.REMOTE_BOMB_CACHE[("en", "fo")] = set()
-        server.GOOGLE_TRANSLATE_API_KEY = "test-google-key"
-        google_response = io.BytesIO(json.dumps({
-            "data": {
-                "translations": [{
-                    "detectedSourceLanguage": "en",
-                    "translatedText": "foobarzz",
-                }]
+        dictionary_response = io.BytesIO(json.dumps({
+            "query": {
+                "pages": {
+                    "-1": {
+                        "title": "foobarzz",
+                        "missing": "",
+                    }
+                }
             }
         }).encode())
-        with patch("server.urllib.request.urlopen", return_value=google_response):
+        with patch("server.urllib.request.urlopen", return_value=dictionary_response):
             self.assertFalse(server.bomb_word_exists("en", "foobarzz"))
 
     def test_firebase_bomb_vocabulary_filters_invalid_keys(self):

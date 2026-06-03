@@ -54,9 +54,8 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
-GOOGLE_TRANSLATE_API_KEY = os.getenv("POLI_GOOGLE_TRANSLATE_API_KEY", "").strip()
-GOOGLE_WORD_FALLBACK = os.getenv("POLI_GOOGLE_WORD_FALLBACK", "1").lower() not in {"0", "false", "no"}
-GOOGLE_WORD_CACHE: dict[tuple[str, str], bool] = {}
+FREE_WORD_FALLBACK = os.getenv("POLI_FREE_WORD_FALLBACK", "1").lower() not in {"0", "false", "no"}
+FREE_WORD_CACHE: dict[tuple[str, str], bool] = {}
 FIREBASE_DATABASE_AUTH = os.getenv("POLI_FIREBASE_DATABASE_AUTH", "").strip()
 
 
@@ -514,36 +513,42 @@ def cache_bomb_word_in_firebase(language: str, word: str) -> None:
         pass
 
 
-def google_bomb_word_exists(language: str, word: str) -> bool:
+def free_dictionary_bomb_word_exists(language: str, word: str) -> bool:
     key = (language, word)
-    if key in GOOGLE_WORD_CACHE:
-        return GOOGLE_WORD_CACHE[key]
-    GOOGLE_WORD_CACHE[key] = False
-    if not GOOGLE_WORD_FALLBACK or not GOOGLE_TRANSLATE_API_KEY:
+    if key in FREE_WORD_CACHE:
+        return FREE_WORD_CACHE[key]
+    FREE_WORD_CACHE[key] = False
+    if not FREE_WORD_FALLBACK:
         return False
-    target = "en" if language == "pt" else "pt"
-    data = urlencode({"q": word, "target": target, "format": "text"}).encode("utf-8")
+    wiki_language = "pt" if language == "pt" else "en"
+    query = urlencode({
+        "action": "query",
+        "format": "json",
+        "redirects": "1",
+        "prop": "extracts",
+        "explaintext": "1",
+        "titles": word,
+    })
     request = urllib.request.Request(
-        f"https://translation.googleapis.com/language/translate/v2?key={GOOGLE_TRANSLATE_API_KEY}",
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
+        f"https://{wiki_language}.wiktionary.org/w/api.php?{query}",
+        headers={"User-Agent": "PoliBrasil-EnglishDuel/1.0 (educational word game)"},
     )
     try:
         with urllib.request.urlopen(request, timeout=4) as response:
             payload = json.load(response)
     except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
         return False
-    translations = payload.get("data", {}).get("translations", [])
-    if not translations:
+    pages = payload.get("query", {}).get("pages", {})
+    page = next(iter(pages.values()), {})
+    extract = page.get("extract", "")
+    if page.get("missing") is not None or normalize(page.get("title", "")) != word:
         return False
-    translation = translations[0]
-    detected = translation.get("detectedSourceLanguage", "")
-    translated = normalize(translation.get("translatedText", ""))
-    detected_ok = not detected or detected.startswith(language)
-    accepted = detected_ok and bool(translated) and translated != word
+    if language == "en":
+        accepted = "==English==" in extract or bool(extract)
+    else:
+        accepted = any(marker in extract for marker in ("==Português==", "==Portuguese==")) or bool(extract)
     if accepted:
-        GOOGLE_WORD_CACHE[key] = True
+        FREE_WORD_CACHE[key] = True
         cache_bomb_word_in_firebase(language, word)
     return accepted
 
@@ -551,7 +556,7 @@ def google_bomb_word_exists(language: str, word: str) -> bool:
 def bomb_word_exists(language: str, word: str) -> bool:
     if word in BOMB_WORDS[language] or word in remote_bomb_words(language, word[:2]):
         return True
-    return google_bomb_word_exists(language, word)
+    return free_dictionary_bomb_word_exists(language, word)
 
 
 def chain_final_syllable(word: str) -> str:
