@@ -13,17 +13,22 @@ const state = {
   room: null,
   roomCode: null,
   context: null,
-  contextPollTimer: null,
+  contextSignalUnsubscribe: null,
+  lastContextSignal: null,
   bomb: null,
-  bombPollTimer: null,
   bombTimer: null,
   bombTypingUnsubscribe: null,
+  bombSignalUnsubscribe: null,
+  lastBombSignal: null,
+  bombRefreshInFlight: false,
   bombTypingValue: "",
   bombTypingByUid: {},
   lastBombFeedback: null,
   lastBombFinish: null,
-  pollTimer: null,
-  rematchPollTimer: null,
+  roomSignalUnsubscribe: null,
+  lastRoomSignal: null,
+  userSignalUnsubscribe: null,
+  lastUserSignal: null,
   pendingRematch: null,
   pendingJoinCode: null,
   pendingBombJoinCode: null,
@@ -60,7 +65,6 @@ async function boot() {
   renderIdentity();
   await loadDashboard();
   openInvite();
-  scheduleRematchRefresh();
 }
 
 function bindInterface() {
@@ -124,8 +128,10 @@ async function connectFirebase() {
     state.auth = authSdk.getAuth(app);
     await new Promise((resolve) => authSdk.onAuthStateChanged(state.auth, async (user) => {
       state.user = user;
+      subscribeUserSignals();
       renderIdentity();
       await loadDashboard();
+      await refreshRematches();
       resolve();
     }));
     $("#connection-label").textContent = "firebase online";
@@ -163,6 +169,8 @@ async function logout() {
     if (state.roomCode) await leaveAndGoHome();
     if (state.context) leaveContext();
     if (state.bomb) await leaveBomb();
+    if (state.userSignalUnsubscribe) state.userSignalUnsubscribe();
+    state.userSignalUnsubscribe = null;
     await state.firebase.signOut(state.auth);
     state.user = null;
     state.profile = null;
@@ -247,6 +255,7 @@ async function joinRoom() {
     const { room } = await api(`/rooms/${code}/join`, { method: "POST", body: {} });
     $("#join-modal").close();
     startRoom(room);
+    await publishRoomSignal("join");
   } catch (error) {
     toast(error.message);
   }
@@ -307,6 +316,7 @@ async function joinContext() {
     const { context } = await api(`/contexts/${code}/join`, { method: "POST", body: {} });
     $("#context-modal").close();
     enterContext(context);
+    await publishContextSignal("join");
   } catch (error) {
     toast(error.message);
   }
@@ -314,11 +324,10 @@ async function joinContext() {
 
 function enterContext(context) {
   state.context = context;
+  subscribeContextSignals();
   renderContext();
   showScreen("context");
   focusInput("#context-input");
-  clearTimeout(state.contextPollTimer);
-  state.contextPollTimer = setTimeout(refreshContext, 900);
 }
 
 async function refreshContext() {
@@ -326,9 +335,49 @@ async function refreshContext() {
   try {
     state.context = (await api(`/contexts/${state.context.code}`)).context;
     renderContext();
-    state.contextPollTimer = setTimeout(refreshContext, document.hidden ? 4000 : 900);
   } catch (error) {
     toast(error.message);
+  }
+}
+
+function contextSignalRef(code = state.context?.code) {
+  if (!state.database || !code) return null;
+  return state.firebaseDatabase.ref(state.database, `liveContexts/${code}/signal`);
+}
+
+function subscribeContextSignals() {
+  if (state.contextSignalUnsubscribe) state.contextSignalUnsubscribe();
+  state.contextSignalUnsubscribe = null;
+  state.lastContextSignal = null;
+  const reference = contextSignalRef();
+  if (!reference) return;
+  let initialized = false;
+  state.contextSignalUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
+    const signal = snapshot.val();
+    if (!initialized) {
+      initialized = true;
+      state.lastContextSignal = signal?.id || null;
+      return;
+    }
+    if (!signal?.id) return;
+    if (signal.id === state.lastContextSignal || signal.uid === state.user?.uid) return;
+    state.lastContextSignal = signal.id;
+    refreshContext();
+  });
+}
+
+async function publishContextSignal(reason, code = state.context?.code) {
+  const reference = contextSignalRef(code);
+  if (!reference || !state.user?.uid) return;
+  try {
+    await state.firebaseDatabase.set(reference, {
+      id: `${Date.now()}-${state.user.uid}-${Math.random().toString(36).slice(2)}`,
+      uid: state.user.uid,
+      reason,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error(error);
   }
 }
 
@@ -367,6 +416,7 @@ async function sendContextGuess(value) {
     renderContext();
     focusInput("#context-input");
     playSound(state.context.status === "solved" ? "gain" : "hit");
+    await publishContextSignal("guess");
   } catch (error) {
     $("#context-feedback").textContent = error.message;
   }
@@ -397,7 +447,8 @@ function renderContext() {
 }
 
 function leaveContext() {
-  clearTimeout(state.contextPollTimer);
+  if (state.contextSignalUnsubscribe) state.contextSignalUnsubscribe();
+  state.contextSignalUnsubscribe = null;
   state.context = null;
   $("#context-input").value = "";
   $("#context-suggestion").classList.add("hidden");
@@ -451,6 +502,7 @@ async function joinBomb() {
     const { bomb } = await api(`/bombs/${code}/join`, { method: "POST", body: {} });
     if ($("#bomb-modal").open) $("#bomb-modal").close();
     enterBomb(bomb);
+    await publishBombSignal("join");
   } catch (error) {
     toast(error.message);
   }
@@ -473,27 +525,30 @@ function enterBomb(bomb) {
   $("#bomb-finish-panel").classList.add("hidden");
   syncRoomClock(bomb);
   subscribeBombTyping();
+  subscribeBombSignals();
   renderBomb();
   showScreen("bomb");
-  scheduleBombRefresh();
 }
 
-async function refreshBomb() {
-  if (!state.bomb) return;
+async function refreshBomb(options = {}) {
+  if (!state.bomb || state.bombRefreshInFlight) return;
+  state.bombRefreshInFlight = true;
   try {
+    const previousFeedback = state.lastBombFeedback;
     state.bomb = (await api(`/bombs/${state.bomb.code}`)).bomb;
     syncRoomClock(state.bomb);
+    const feedback = state.bomb.lastFeedback;
+    if (feedback?.kind === "timeout" && feedback.uid === state.user.uid && feedback.id !== previousFeedback) {
+      $("#bomb-input").value = "";
+      await clearBombTyping();
+    }
     renderBomb();
-    scheduleBombRefresh();
+    if (options.broadcast) await publishBombSignal(options.reason || "refresh");
   } catch (error) {
     toast(error.message);
+  } finally {
+    state.bombRefreshInFlight = false;
   }
-}
-
-function scheduleBombRefresh() {
-  clearTimeout(state.bombPollTimer);
-  if (!state.bomb) return;
-  state.bombPollTimer = setTimeout(refreshBomb, document.hidden ? 4000 : 800);
 }
 
 function renderBomb() {
@@ -584,6 +639,10 @@ function renderBombFeedback(feedback) {
     element.textContent = `${actor} perdeu um coração: tempo esgotado.`;
     element.className = "feedback timeout";
     if (isNewFeedback) playSound("explosion");
+  } else if (feedback.kind === "duplicate") {
+    element.textContent = `${actor} tentou repetir ${feedback.answer}. Essa palavra ja foi usada.`;
+    element.className = "feedback wrong";
+    if (isNewFeedback) playSound("wrong");
   } else {
     element.textContent = "Palavra inválida. Corrija antes do tempo acabar.";
     element.className = "feedback wrong";
@@ -626,7 +685,7 @@ function startBombTimer() {
     $("#bomb-timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
     $("#bomb-timer-number").textContent = Math.ceil(remaining / 1000);
     $("#bomb-screen").classList.toggle("danger", remaining > 0 && remaining <= 3000);
-    if (remaining <= 0) refreshBomb();
+    if (remaining <= 0) refreshBomb({ broadcast: true, reason: "timeout" });
   };
   tick();
   state.bombTimer = setInterval(tick, 160);
@@ -637,6 +696,7 @@ async function toggleBombReady() {
     const ready = !state.bomb.players[state.user.uid]?.ready;
     state.bomb = (await api(`/bombs/${state.bomb.code}/ready`, { method: "POST", body: { ready } })).bomb;
     renderBomb();
+    await publishBombSignal("ready");
   } catch (error) {
     toast(error.message);
   }
@@ -648,6 +708,7 @@ async function startBombMatch() {
     syncRoomClock(state.bomb);
     await clearBombTyping();
     renderBomb();
+    await publishBombSignal("start");
   } catch (error) {
     toast(error.message);
   }
@@ -664,6 +725,7 @@ async function submitBombAnswer(event) {
     await clearBombTyping();
     syncRoomClock(state.bomb);
     renderBomb();
+    await publishBombSignal("answer");
   } catch (error) {
     if (error.payload?.bomb) {
       state.bomb = error.payload.bomb;
@@ -678,6 +740,47 @@ async function submitBombAnswer(event) {
 function bombTypingRootRef() {
   if (!state.database || !state.bomb) return null;
   return state.firebaseDatabase.ref(state.database, `liveBombRooms/${state.bomb.code}/typing`);
+}
+
+function bombSignalRef(code = state.bomb?.code) {
+  if (!state.database || !code) return null;
+  return state.firebaseDatabase.ref(state.database, `liveBombRooms/${code}/signal`);
+}
+
+function subscribeBombSignals() {
+  if (state.bombSignalUnsubscribe) state.bombSignalUnsubscribe();
+  state.bombSignalUnsubscribe = null;
+  state.lastBombSignal = null;
+  const reference = bombSignalRef();
+  if (!reference) return;
+  let initialized = false;
+  state.bombSignalUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
+    const signal = snapshot.val();
+    if (!initialized) {
+      initialized = true;
+      state.lastBombSignal = signal?.id || null;
+      return;
+    }
+    if (!signal?.id) return;
+    if (signal.id === state.lastBombSignal || signal.uid === state.user?.uid) return;
+    state.lastBombSignal = signal.id;
+    refreshBomb({ broadcast: false });
+  });
+}
+
+async function publishBombSignal(reason, code = state.bomb?.code) {
+  const reference = bombSignalRef(code);
+  if (!reference || !state.user?.uid) return;
+  try {
+    await state.firebaseDatabase.set(reference, {
+      id: `${Date.now()}-${state.user.uid}-${Math.random().toString(36).slice(2)}`,
+      uid: state.user.uid,
+      reason,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function subscribeBombTyping() {
@@ -739,6 +842,7 @@ async function requestBombRematch() {
     $("#bomb-finish-panel").classList.add("hidden");
     await clearBombTyping();
     renderBomb();
+    await publishBombSignal("rematch");
     toast("Lobby restaurado. Todos precisam marcar pronto novamente.");
   } catch (error) {
     toast(error.message);
@@ -747,10 +851,11 @@ async function requestBombRematch() {
 
 async function leaveBomb() {
   const bomb = state.bomb;
-  clearTimeout(state.bombPollTimer);
   clearInterval(state.bombTimer);
   if (state.bombTypingUnsubscribe) state.bombTypingUnsubscribe();
   state.bombTypingUnsubscribe = null;
+  if (state.bombSignalUnsubscribe) state.bombSignalUnsubscribe();
+  state.bombSignalUnsubscribe = null;
   state.bomb = null;
   $("#bomb-input").value = "";
   $("#bomb-live-typing").textContent = "";
@@ -759,7 +864,10 @@ async function leaveBomb() {
   $("#bomb-finish-panel").classList.add("hidden");
   showScreen("home");
   if (bomb) {
-    try { await api(`/bombs/${bomb.code}/leave`, { method: "POST", body: {} }); } catch {}
+    try {
+      await api(`/bombs/${bomb.code}/leave`, { method: "POST", body: {} });
+      await publishBombSignal("leave", bomb.code);
+    } catch {}
   }
   await loadDashboard();
 }
@@ -772,33 +880,111 @@ function startRoom(room) {
   state.lastFeedback = null;
   state.pendingRematch = null;
   if ($("#rematch-invite-modal").open) $("#rematch-invite-modal").close();
+  subscribeRoomSignals();
   renderRoom();
-  scheduleRoomRefresh();
 }
 
-async function refreshRoom() {
+async function refreshRoom(options = {}) {
   if (!state.roomCode || state.pollInFlight) return;
   state.pollInFlight = true;
-  let keepPolling = true;
   try {
     state.room = (await api(`/rooms/${state.roomCode}`)).room;
     syncRoomClock(state.room);
     renderRoom();
+    if (options.broadcast) await publishRoomSignal(options.reason || "refresh");
   } catch (error) {
-    clearTimeout(state.pollTimer);
-    keepPolling = false;
     toast(error.message);
   } finally {
     state.pollInFlight = false;
-    if (keepPolling) scheduleRoomRefresh();
   }
 }
 
-function scheduleRoomRefresh() {
-  clearTimeout(state.pollTimer);
-  if (!state.roomCode) return;
-  const delay = document.hidden ? 5000 : state.room?.status === "playing" ? 800 : 2500;
-  state.pollTimer = setTimeout(refreshRoom, delay);
+function roomSignalRef(code = state.roomCode) {
+  if (!state.database || !code) return null;
+  return state.firebaseDatabase.ref(state.database, `liveRooms/${code}/signal`);
+}
+
+function subscribeRoomSignals() {
+  if (state.roomSignalUnsubscribe) state.roomSignalUnsubscribe();
+  state.roomSignalUnsubscribe = null;
+  state.lastRoomSignal = null;
+  const reference = roomSignalRef();
+  if (!reference) return;
+  let initialized = false;
+  state.roomSignalUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
+    const signal = snapshot.val();
+    if (!initialized) {
+      initialized = true;
+      state.lastRoomSignal = signal?.id || null;
+      return;
+    }
+    if (!signal?.id) return;
+    if (signal.id === state.lastRoomSignal || signal.uid === state.user?.uid) return;
+    state.lastRoomSignal = signal.id;
+    refreshRoom({ broadcast: false });
+  });
+}
+
+async function publishRoomSignal(reason, code = state.roomCode) {
+  const reference = roomSignalRef(code);
+  if (!reference || !state.user?.uid) return;
+  try {
+    await state.firebaseDatabase.set(reference, {
+      id: `${Date.now()}-${state.user.uid}-${Math.random().toString(36).slice(2)}`,
+      uid: state.user.uid,
+      reason,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function userSignalRef(uid = state.user?.uid) {
+  if (!state.database || !uid) return null;
+  return state.firebaseDatabase.ref(state.database, `liveUsers/${uid}/signal`);
+}
+
+function subscribeUserSignals() {
+  if (state.userSignalUnsubscribe) state.userSignalUnsubscribe();
+  state.userSignalUnsubscribe = null;
+  state.lastUserSignal = null;
+  if (!isGoogleUser()) return;
+  const reference = userSignalRef();
+  if (!reference) return;
+  let initialized = false;
+  state.userSignalUnsubscribe = state.firebaseDatabase.onValue(reference, (snapshot) => {
+    const signal = snapshot.val();
+    if (!initialized) {
+      initialized = true;
+      state.lastUserSignal = signal?.id || null;
+      return;
+    }
+    if (!signal?.id || signal.id === state.lastUserSignal) return;
+    state.lastUserSignal = signal.id;
+    refreshRematches();
+  });
+}
+
+async function publishUserSignal(uid, reason, roomCode = state.roomCode) {
+  const reference = userSignalRef(uid);
+  if (!reference || !state.user?.uid || uid === state.user.uid || uid === "bot") return;
+  try {
+    await state.firebaseDatabase.set(reference, {
+      id: `${Date.now()}-${state.user.uid}-${Math.random().toString(36).slice(2)}`,
+      fromUid: state.user.uid,
+      roomCode,
+      reason,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function publishRoomPlayerSignals(reason, room = state.room) {
+  if (!room?.players) return;
+  await Promise.all(Object.keys(room.players).map((uid) => publishUserSignal(uid, reason, room.code)));
 }
 
 function renderRoom() {
@@ -897,7 +1083,7 @@ function startTimer() {
     const remaining = Math.min(ROUND_MS, Math.max(0, Number(state.room.deadline) - (Date.now() + state.serverOffset)));
     $("#timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
     $("#timer-number").textContent = Math.ceil(remaining / 1000);
-    if (remaining <= 0) refreshRoom();
+    if (remaining <= 0) refreshRoom({ broadcast: true, reason: "timeout" });
   };
   tick();
   state.timer = setInterval(tick, 160);
@@ -912,6 +1098,7 @@ async function submitAnswer(event) {
   try {
     state.room = (await api(`/rooms/${state.roomCode}/answer`, { method: "POST", body: { answer, round: state.room.round } })).room;
     renderRoom();
+    await publishRoomSignal("answer");
   } catch (error) {
     toast(error.message);
   }
@@ -921,6 +1108,8 @@ async function requestRematch() {
   try {
     state.room = (await api(`/rooms/${state.roomCode}/rematch`, { method: "POST", body: { decision: "request" } })).room;
     renderRoom();
+    await publishRoomSignal("rematch");
+    await publishRoomPlayerSignals("rematch", state.room);
     toast("Convite de revanche enviado");
   } catch (error) {
     toast(error.message);
@@ -933,15 +1122,19 @@ function syncRoomClock(room) {
 
 async function leaveAndGoHome() {
   const code = state.roomCode;
-  clearTimeout(state.pollTimer);
   clearInterval(state.timer);
+  if (state.roomSignalUnsubscribe) state.roomSignalUnsubscribe();
+  state.roomSignalUnsubscribe = null;
   state.room = null;
   state.roomCode = null;
   state.lastRound = -1;
   if ($("#finish-modal").open) $("#finish-modal").close();
   showScreen("home");
   if (code) {
-    try { await api(`/rooms/${code}/leave`, { method: "POST", body: {} }); } catch {}
+    try {
+      await api(`/rooms/${code}/leave`, { method: "POST", body: {} });
+      await publishRoomSignal("leave", code);
+    } catch {}
   }
   await loadDashboard();
 }
@@ -963,8 +1156,7 @@ async function loadDashboard() {
 }
 
 async function refreshRematches() {
-  clearTimeout(state.rematchPollTimer);
-  if (!isGoogleUser()) return scheduleRematchRefresh();
+  if (!isGoogleUser() || state.roomCode) return;
   try {
     const { rematches, activeRooms } = await api("/rematches");
     if (!state.roomCode && activeRooms.length) return startRoom(activeRooms[0]);
@@ -972,12 +1164,6 @@ async function refreshRematches() {
   } catch (error) {
     console.error(error);
   }
-  scheduleRematchRefresh();
-}
-
-function scheduleRematchRefresh() {
-  clearTimeout(state.rematchPollTimer);
-  state.rematchPollTimer = setTimeout(refreshRematches, document.hidden ? 8000 : 3000);
 }
 
 function showRematchInvite(rematch) {
@@ -994,6 +1180,8 @@ async function acceptRematch() {
     $("#rematch-invite-modal").close();
     if ($("#finish-modal").open) $("#finish-modal").close();
     startRoom(room);
+    await publishRoomSignal("rematch");
+    await publishRoomPlayerSignals("rematch", room);
   } catch (error) {
     toast(error.message);
   }
@@ -1006,6 +1194,8 @@ async function declineRematch() {
     if (state.roomCode === room.code) state.room = room;
     state.pendingRematch = null;
     $("#rematch-invite-modal").close();
+    await publishRoomSignal("rematch", room.code);
+    await publishRoomPlayerSignals("rematch", room);
     toast("Convite de revanche recusado");
   } catch (error) {
     toast(error.message);

@@ -1,7 +1,8 @@
 __pycache__/
-.codex-preview/
 *.pyc
 *.rar
+.codex-preview/
+.txt
 docs/.~lock.*#
 .DS_Store
 data/poli.db

@@ -6,12 +6,44 @@
       ".read": false,
       ".write": false
     },
+    "liveRooms": {
+      "$room": {
+        "signal": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['id', 'uid', 'reason', 'updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 96 && newData.child('reason').isString() && newData.child('reason').val().length <= 32 && newData.child('updatedAt').isNumber()"
+        }
+      }
+    },
+    "liveUsers": {
+      "$uid": {
+        "signal": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['id', 'fromUid', 'roomCode', 'reason', 'updatedAt']) && newData.child('fromUid').val() === auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 96 && newData.child('roomCode').isString() && newData.child('roomCode').val().length <= 6 && newData.child('reason').isString() && newData.child('reason').val().length <= 32 && newData.child('updatedAt').isNumber()"
+        }
+      }
+    },
+    "liveContexts": {
+      "$context": {
+        "signal": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['id', 'uid', 'reason', 'updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 96 && newData.child('reason').isString() && newData.child('reason').val().length <= 32 && newData.child('updatedAt').isNumber()"
+        }
+      }
+    },
     "bombVocabulary": {
       ".read": true,
       ".write": false
     },
     "liveBombRooms": {
       "$room": {
+        "signal": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['id', 'uid', 'reason', 'updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 96 && newData.child('reason').isString() && newData.child('reason').val().length <= 32 && newData.child('updatedAt').isNumber()"
+        },
         "typing": {
           ".read": "auth != null",
           "$uid": {

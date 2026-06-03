@@ -251,6 +251,18 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["turn"], "one")
         self.assertEqual(bomb["players"]["one"]["hearts"], 3)
 
+    def test_word_bomb_duplicate_word_has_specific_feedback(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {"book": True}, "usedPrompts": ["oo"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "book")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["turn"], "one")
+        self.assertEqual(bomb["lastFeedback"]["kind"], "duplicate")
+
     def test_word_bomb_timeout_removes_heart_and_moves_turn(self):
         bomb = {
             "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",

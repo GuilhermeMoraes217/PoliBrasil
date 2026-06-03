@@ -23,6 +23,7 @@ PUBLIC = ROOT / "public"
 DATA = ROOT / "data" / "vocabulary.json"
 FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
+FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
 BOMB_MAX_PLAYERS = 8
@@ -41,21 +42,6 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
-
-
-def load_firebase_api_key() -> str:
-    configured_key = os.getenv("POLI_FIREBASE_API_KEY", "").strip()
-    if configured_key:
-        return configured_key
-    config_file = PUBLIC / "firebase-config.js"
-    config_text = config_file.read_text(encoding="utf-8")
-    match = re.search(r'apiKey:\s*"([^"]+)"', config_text)
-    if not match:
-        raise RuntimeError("Configure POLI_FIREBASE_API_KEY or public/firebase-config.js.")
-    return match.group(1)
-
-
-FIREBASE_API_KEY = load_firebase_api_key()
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
@@ -531,11 +517,13 @@ def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer
     if bomb["status"] != "playing" or bomb.get("turn") != uid:
         return bomb, False
     normalized = normalize(answer)
+    if normalized in bomb.setdefault("usedWords", {}):
+        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "duplicate", "answer": normalized}
+        return bomb, False
     valid = (
         len(normalized) >= 3
         and bomb["prompt"] in normalized
         and bomb_word_exists(bomb["language"], normalized)
-        and normalized not in bomb.setdefault("usedWords", {})
     )
     if not valid:
         bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "invalid", "answer": normalized}
@@ -751,7 +739,11 @@ class PoliHandler(SimpleHTTPRequestHandler):
             bomb, accepted = apply_bomb_answer(database, bomb, user["uid"], str(payload.get("answer", "")))
             write_bomb(database, bomb)
         status = 200 if accepted else 400
-        return self.send_json({"bomb": public_bomb(bomb), "error": None if accepted else "Palavra invalida. Tente novamente antes do tempo acabar."}, status=status)
+        error = None
+        if not accepted:
+            feedback = bomb.get("lastFeedback", {})
+            error = "Esta palavra ja foi usada nesta partida." if feedback.get("kind") == "duplicate" else "Palavra invalida. Tente novamente antes do tempo acabar."
+        return self.send_json({"bomb": public_bomb(bomb), "error": error}, status=status)
 
     def leave_bomb(self, code: str, user: dict, payload: dict):
         del payload
