@@ -505,6 +505,25 @@ def public_bomb(bomb: dict) -> dict:
     return public
 
 
+def set_bomb_feedback(bomb: dict, uid: str, kind: str, answer: str, **extra) -> dict:
+    feedback = {"id": now_ms(), "uid": uid, "kind": kind, "answer": answer, **extra}
+    bomb["lastFeedback"] = feedback
+    if kind in {"correct", "invalid", "duplicate", "missing_syllable"}:
+        entry = {
+            "id": feedback["id"],
+            "uid": uid,
+            "kind": kind,
+            "answer": answer,
+            "round": bomb.get("round", 0),
+        }
+        for key in ("required", "xp", "nextSyllable", "nextStart"):
+            if key in extra:
+                entry[key] = extra[key]
+        bomb.setdefault("answerLog", []).append(entry)
+        bomb["answerLog"] = bomb["answerLog"][-32:]
+    return feedback
+
+
 def record_bomb_ranking(database: sqlite3.Connection, bomb: dict) -> dict:
     if bomb.get("rankingRecorded"):
         return bomb
@@ -568,24 +587,21 @@ def apply_chain_answer(database: sqlite3.Connection, bomb: dict, uid: str, answe
     del database
     normalized = normalize(answer)
     if normalized in bomb.setdefault("usedWords", {}):
-        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "duplicate", "answer": normalized}
+        set_bomb_feedback(bomb, uid, "duplicate", normalized)
         return bomb, False
     required = bomb.get("requiredSyllable") or bomb.get("requiredStart")
     if required and required not in normalized:
-        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "missing_syllable", "answer": normalized, "required": required}
+        set_bomb_feedback(bomb, uid, "missing_syllable", normalized, required=required)
         return bomb, False
     if len(normalized) < 3 or not normalized.isalpha() or not bomb_word_exists(bomb["language"], normalized):
-        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "invalid", "answer": normalized}
+        set_bomb_feedback(bomb, uid, "invalid", normalized)
         return bomb, False
     bomb["usedWords"][normalized] = True
     bomb["lastWord"] = normalized
     bomb["requiredSyllable"] = chain_final_syllable(normalized)
     bomb.pop("requiredStart", None)
     bomb["players"][uid]["score"] = bomb["players"][uid].get("score", 0) + 100
-    bomb["lastFeedback"] = {
-        "id": now_ms(), "uid": uid, "kind": "correct", "answer": normalized,
-        "xp": 100, "nextSyllable": bomb["requiredSyllable"],
-    }
+    set_bomb_feedback(bomb, uid, "correct", normalized, xp=100, nextSyllable=bomb["requiredSyllable"])
     return next_bomb_turn(bomb), True
 
 
@@ -596,7 +612,7 @@ def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer
         return apply_chain_answer(database, bomb, uid, answer)
     normalized = normalize(answer)
     if normalized in bomb.setdefault("usedWords", {}):
-        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "duplicate", "answer": normalized}
+        set_bomb_feedback(bomb, uid, "duplicate", normalized)
         return bomb, False
     valid = (
         len(normalized) >= 3
@@ -604,11 +620,11 @@ def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer
         and bomb_word_exists(bomb["language"], normalized)
     )
     if not valid:
-        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "invalid", "answer": normalized}
+        set_bomb_feedback(bomb, uid, "invalid", normalized)
         return bomb, False
     bomb["usedWords"][normalized] = True
     bomb["players"][uid]["score"] = bomb["players"][uid].get("score", 0) + 100
-    bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "correct", "answer": normalized, "xp": 100}
+    set_bomb_feedback(bomb, uid, "correct", normalized, xp=100)
     return next_bomb_turn(bomb, database), True
 
 
@@ -748,7 +764,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             bomb = {
                 "code": code, "owner": user["uid"], "mode": mode, "language": language, "difficulty": "easy", "sublevel": 1, "status": "waiting",
                 "createdAt": now_ms(), "round": 0, "players": {user["uid"]: player}, "order": [user["uid"]],
-                "usedWords": {}, "usedPrompts": [], "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
+                "usedWords": {}, "usedPrompts": [], "answerLog": [], "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
             }
             if mode == "word_chain":
                 bomb.update({"lastWord": None, "requiredSyllable": None})
@@ -866,7 +882,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             if bomb["status"] != "finished":
                 return self.send_json({"error": "A revanche so pode ser solicitada apos a partida"}, status=409)
             bomb.update({
-                "status": "waiting", "round": 0, "usedWords": {}, "usedPrompts": [],
+                "status": "waiting", "round": 0, "usedWords": {}, "usedPrompts": [], "answerLog": [],
                 "winner": None, "finishReason": None, "lastFeedback": None, "deadline": now_ms(),
                 "difficulty": "easy", "sublevel": 1, "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
             })

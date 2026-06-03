@@ -227,6 +227,8 @@ class GameEngineTest(unittest.TestCase):
         self.assertTrue(accepted)
         self.assertEqual(bomb["players"]["one"]["score"], 100)
         self.assertEqual(bomb["turn"], "two")
+        self.assertEqual(bomb["answerLog"][-1]["answer"], "book")
+        self.assertEqual(bomb["answerLog"][-1]["kind"], "correct")
 
     def test_word_bomb_accepts_prompt_in_the_middle_of_word(self):
         bomb = {
@@ -238,6 +240,7 @@ class GameEngineTest(unittest.TestCase):
             bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "book")
         self.assertTrue(accepted)
         self.assertEqual(bomb["turn"], "two")
+        self.assertEqual(bomb["answerLog"][-1]["answer"], "book")
 
     def test_word_chain_first_answer_sets_next_required_syllable(self):
         bomb = {
@@ -253,6 +256,7 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["lastWord"], "banana")
         self.assertEqual(bomb["players"]["one"]["score"], 100)
         self.assertEqual(bomb["turn"], "two")
+        self.assertEqual(bomb["answerLog"][-1]["nextSyllable"], "na")
 
     def test_word_chain_rejects_missing_required_syllable_without_losing_turn(self):
         bomb = {
@@ -267,6 +271,8 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["turn"], "two")
         self.assertEqual(bomb["players"]["two"]["hearts"], 3)
         self.assertEqual(bomb["lastFeedback"]["kind"], "missing_syllable")
+        self.assertEqual(bomb["answerLog"][-1]["kind"], "missing_syllable")
+        self.assertEqual(bomb["answerLog"][-1]["required"], "na")
 
     def test_word_chain_rejects_repeated_word(self):
         bomb = {
@@ -279,6 +285,7 @@ class GameEngineTest(unittest.TestCase):
             bomb, accepted = server.apply_bomb_answer(database, bomb, "two", "banana")
         self.assertFalse(accepted)
         self.assertEqual(bomb["lastFeedback"]["kind"], "duplicate")
+        self.assertEqual(bomb["answerLog"][-1]["kind"], "duplicate")
 
     def test_word_bomb_invalid_word_keeps_turn_until_timeout(self):
         bomb = {
@@ -291,6 +298,8 @@ class GameEngineTest(unittest.TestCase):
         self.assertFalse(accepted)
         self.assertEqual(bomb["turn"], "one")
         self.assertEqual(bomb["players"]["one"]["hearts"], 3)
+        self.assertEqual(bomb["answerLog"][-1]["answer"], "inventedword")
+        self.assertEqual(bomb["answerLog"][-1]["kind"], "invalid")
 
     def test_word_bomb_duplicate_word_has_specific_feedback(self):
         bomb = {
@@ -316,10 +325,11 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["turn"], "two")
 
     def test_word_bomb_public_state_hides_used_words(self):
-        bomb = {"code": "BOMB01", "players": {}, "usedWords": {"book": True}, "usedPrompts": ["oo"]}
+        bomb = {"code": "BOMB01", "players": {}, "usedWords": {"book": True}, "usedPrompts": ["oo"], "answerLog": [{"answer": "book", "kind": "correct"}]}
         public = server.public_bomb(bomb)
         self.assertNotIn("usedWords", public)
         self.assertNotIn("usedPrompts", public)
+        self.assertEqual(public["answerLog"][0]["answer"], "book")
         self.assertIn("serverNow", public)
 
     def test_word_bomb_portuguese_dictionary_normalizes_accents(self):

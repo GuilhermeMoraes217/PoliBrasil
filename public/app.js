@@ -611,6 +611,7 @@ function renderBomb() {
       </div>
     `).join("")}</div>
   ` : "";
+  renderBombAnswerLog();
   const turnStage = $(".bomb-turn-stage");
   const compactArena = turnStage.clientWidth < 600;
   $("#bomb-players").innerHTML = players.map((player, index) => {
@@ -686,6 +687,36 @@ function renderBombFeedback(feedback) {
     element.className = "feedback wrong";
     if (isNewFeedback) playSound("wrong");
   }
+}
+
+function renderBombAnswerLog() {
+  const log = (state.bomb?.answerLog || []).slice().reverse();
+  const list = $("#bomb-answer-log-list");
+  if (!list) return;
+  list.innerHTML = log.length ? log.map((entry) => {
+    const player = state.bomb.players[entry.uid];
+    const label = bombLogLabel(entry);
+    const detail = entry.kind === "missing_syllable"
+      ? `REQ ${String(entry.required || "").toUpperCase()}`
+      : entry.kind === "correct" && entry.nextSyllable
+        ? `NEXT ${String(entry.nextSyllable).toUpperCase()}`
+        : `R${entry.round || 0}`;
+    return `
+      <div class="bomb-log-row ${entry.kind}">
+        <span>${label}</span>
+        <b>${escapeHtml(entry.answer || "")}</b>
+        <em>${escapeHtml(player?.name || "PLAYER")}</em>
+        <small>${escapeHtml(detail)}</small>
+      </div>
+    `;
+  }).join("") : `<p class="bomb-log-empty">Nenhuma palavra enviada ainda.</p>`;
+}
+
+function bombLogLabel(entry) {
+  if (entry.kind === "correct") return "OK";
+  if (entry.kind === "duplicate") return "REP";
+  if (entry.kind === "missing_syllable") return "SIL";
+  return "ERR";
 }
 
 function playerPosition(index, total, compact = false) {
