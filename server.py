@@ -15,7 +15,7 @@ from contextlib import closing
 from difflib import SequenceMatcher
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -54,6 +54,10 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
+GOOGLE_TRANSLATE_API_KEY = os.getenv("POLI_GOOGLE_TRANSLATE_API_KEY", "").strip()
+GOOGLE_WORD_FALLBACK = os.getenv("POLI_GOOGLE_WORD_FALLBACK", "1").lower() not in {"0", "false", "no"}
+GOOGLE_WORD_CACHE: dict[tuple[str, str], bool] = {}
+FIREBASE_DATABASE_AUTH = os.getenv("POLI_FIREBASE_DATABASE_AUTH", "").strip()
 
 
 def load_firebase_api_key() -> str:
@@ -467,13 +471,20 @@ def update_bomb_progression(bomb: dict) -> dict:
     return bomb
 
 
+def firebase_database_rest_url(path: str) -> str:
+    url = f"{FIREBASE_DATABASE_URL}/{path.strip('/')}.json"
+    if FIREBASE_DATABASE_AUTH:
+        url = f"{url}?auth={FIREBASE_DATABASE_AUTH}"
+    return url
+
+
 def remote_bomb_words(language: str, prefix: str) -> set[str]:
     key = (language, prefix)
     if key in REMOTE_BOMB_CACHE:
         return REMOTE_BOMB_CACHE[key]
     words: set[str] = set()
     if REMOTE_BOMB_VOCABULARY:
-        url = f"{FIREBASE_DATABASE_URL}/bombVocabulary/chunks/{language}/{prefix}.json"
+        url = firebase_database_rest_url(f"bombVocabulary/chunks/{language}/{prefix}")
         try:
             with urllib.request.urlopen(url, timeout=3) as response:
                 payload = json.load(response) or {}
@@ -484,8 +495,63 @@ def remote_bomb_words(language: str, prefix: str) -> set[str]:
     return words
 
 
+def cache_bomb_word_in_firebase(language: str, word: str) -> None:
+    prefix = word[:2]
+    REMOTE_BOMB_CACHE.setdefault((language, prefix), set()).add(word)
+    if not REMOTE_BOMB_VOCABULARY:
+        return
+    url = firebase_database_rest_url(f"bombVocabulary/chunks/{language}/{prefix}/{word}")
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(True).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3):
+            pass
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        pass
+
+
+def google_bomb_word_exists(language: str, word: str) -> bool:
+    key = (language, word)
+    if key in GOOGLE_WORD_CACHE:
+        return GOOGLE_WORD_CACHE[key]
+    GOOGLE_WORD_CACHE[key] = False
+    if not GOOGLE_WORD_FALLBACK or not GOOGLE_TRANSLATE_API_KEY:
+        return False
+    target = "en" if language == "pt" else "pt"
+    data = urlencode({"q": word, "target": target, "format": "text"}).encode("utf-8")
+    request = urllib.request.Request(
+        f"https://translation.googleapis.com/language/translate/v2?key={GOOGLE_TRANSLATE_API_KEY}",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=4) as response:
+            payload = json.load(response)
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return False
+    translations = payload.get("data", {}).get("translations", [])
+    if not translations:
+        return False
+    translation = translations[0]
+    detected = translation.get("detectedSourceLanguage", "")
+    translated = normalize(translation.get("translatedText", ""))
+    detected_ok = not detected or detected.startswith(language)
+    accepted = detected_ok and bool(translated) and translated != word
+    if accepted:
+        GOOGLE_WORD_CACHE[key] = True
+        cache_bomb_word_in_firebase(language, word)
+    return accepted
+
+
 def bomb_word_exists(language: str, word: str) -> bool:
-    return word in BOMB_WORDS[language] or word in remote_bomb_words(language, word[:2])
+    if word in BOMB_WORDS[language] or word in remote_bomb_words(language, word[:2]):
+        return True
+    return google_bomb_word_exists(language, word)
 
 
 def chain_final_syllable(word: str) -> str:
