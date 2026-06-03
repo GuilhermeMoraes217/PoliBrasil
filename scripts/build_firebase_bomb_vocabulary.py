@@ -14,6 +14,15 @@ SOURCES = {
     "en": "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.dic",
     "pt": "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/pt_BR/pt_BR.dic",
 }
+EXTRA_WORDS = {
+    "pt": {
+        "tarado", "tarada", "tarados", "taradas",
+        "acai", "bacaba", "bacuri", "belem", "breu", "carimbo", "chibe", "cupuacu",
+        "curua", "egua", "farinha", "igarape", "jambu", "mani", "manicoba", "marajo",
+        "marajoara", "miriti", "mucura", "nazare", "paidegua", "paraense", "pato",
+        "pavulagem", "pirarucu", "pupunha", "tacaca", "tapereba", "tucupi", "veropa",
+    }
+}
 
 
 def normalize(value: str) -> str:
@@ -47,6 +56,8 @@ def build_chunks() -> dict:
     }
     for language, url in SOURCES.items():
         languages[language].update(read_hunspell(url))
+    for language, words in EXTRA_WORDS.items():
+        languages.setdefault(language, set()).update(normalized_words(words))
     chunks = {}
     for language, words in languages.items():
         chunks[language] = {}

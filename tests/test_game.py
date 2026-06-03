@@ -350,10 +350,15 @@ class GameEngineTest(unittest.TestCase):
         easy = server.BOMB_PROMPTS["pt"]["easy"]
         hard = server.BOMB_PROMPTS["pt"]["hard"]
         self.assertTrue({"ba", "ca", "ta"}.issubset(easy))
-        self.assertIn("st", hard)
+        self.assertTrue(hard)
         for difficulty in server.BOMB_DIFFICULTIES:
-            self.assertNotIn("mm", server.BOMB_PROMPTS["pt"][difficulty])
-            self.assertNotIn("cc", server.BOMB_PROMPTS["pt"][difficulty])
+            for invalid_prompt in ("cc", "mb", "mm", "ms", "st"):
+                self.assertNotIn(invalid_prompt, server.BOMB_PROMPTS["pt"][difficulty])
+
+    def test_word_bomb_portuguese_extra_words_cover_requested_and_para_terms(self):
+        for word in ("tarado", "tacaca", "jambu", "paidegua"):
+            self.assertIn(word, server.BOMB_WORDS["pt"])
+            self.assertTrue(server.bomb_word_exists("pt", word))
 
     def test_word_bomb_progression_advances_sublevels_and_difficulties(self):
         bomb = {"round": 0, "progression": {"stage": 0, "nextLevelAt": 1}}
@@ -393,6 +398,22 @@ class GameEngineTest(unittest.TestCase):
             updated = server.read_bomb(database, "BOMB01")
         self.assertEqual(updated["turn"], "one")
 
+    def test_word_bomb_eliminated_middle_player_does_not_skip_next_player(self):
+        bomb = {
+            "code": "BOMB01", "status": "playing", "language": "en", "difficulty": "easy", "sublevel": 1,
+            "round": 4, "turn": "two", "prompt": "oo", "deadline": 0,
+            "players": {
+                "one": self.player_one.copy(),
+                "two": {**self.player_two.copy(), "hearts": 1},
+                "three": {"uid": "three", "name": "PLAYER_THREE", "photo": "", "hearts": 3, "score": 0},
+            },
+            "order": ["one", "two", "three"], "usedWords": {}, "usedPrompts": ["oo"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb = server.advance_bomb(database, bomb)
+        self.assertEqual(bomb["players"]["two"]["hearts"], 0)
+        self.assertEqual(bomb["turn"], "three")
+
     def test_word_bomb_can_validate_remote_prefix_chunk(self):
         server.REMOTE_BOMB_VOCABULARY = True
         response = io.BytesIO(json.dumps({"poliglota": True}).encode())
@@ -403,6 +424,8 @@ class GameEngineTest(unittest.TestCase):
         words = build_firebase_bomb_vocabulary.normalized_words(["etc.", "either ... or", "maçã", "guarda-chuva"])
         self.assertEqual(words, {"maca", "guardachuva"})
         build_firebase_bomb_vocabulary.validate_firebase_keys({"chunks": {"pt": {"ma": {"maca": True}}}})
+        self.assertIn("tarado", build_firebase_bomb_vocabulary.EXTRA_WORDS["pt"])
+        self.assertIn("tacaca", build_firebase_bomb_vocabulary.EXTRA_WORDS["pt"])
 
 
 if __name__ == "__main__":

@@ -36,6 +36,19 @@ EASY_BOMB_PROMPTS = {
     "en": ("ba", "ca", "da", "fa", "ha", "la", "ma", "na", "pa", "ra", "sa", "ta", "bo", "co", "ga", "wa"),
     "pt": ("ba", "ca", "da", "de", "do", "fa", "la", "ma", "na", "pa", "ra", "sa", "ta", "va", "co", "ga"),
 }
+PORTUGUESE_ALLOWED_CONSONANT_PROMPTS = {
+    "br", "cr", "dr", "fr", "gr", "pr", "tr", "vr",
+    "bl", "cl", "fl", "gl", "pl", "ch", "lh", "nh",
+}
+PORTUGUESE_EXTRA_BOMB_WORDS = {
+    # Common PT-BR words missing from some dictionary sources.
+    "tarado", "tarada", "tarados", "taradas",
+    # Para regional and cultural vocabulary. Keep normalized here; accents are accepted at input time.
+    "acai", "bacaba", "bacuri", "belem", "breu", "carimbo", "chibe", "cupuacu",
+    "curua", "egua", "farinha", "igarape", "jambu", "mani", "manicoba", "marajo",
+    "marajoara", "miriti", "mucura", "nazare", "paidegua", "paraense", "pato",
+    "pavulagem", "pirarucu", "pupunha", "tacaca", "tapereba", "tucupi", "veropa",
+}
 LOCK = threading.RLock()
 TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
@@ -359,14 +372,26 @@ def record_context_ranking(database: sqlite3.Connection, context: dict) -> dict:
 
 def bomb_dictionary(language: str) -> set[str]:
     if language == "pt":
-        return {
+        words = {
             normalize(word) for word in FREEDICT["portuguese"]
             if len(normalize(word)) >= 3 and normalize(word).isalpha()
         }
+        words.update(PORTUGUESE_EXTRA_BOMB_WORDS)
+        return words
     return {
         normalize(word) for word in FREEDICT["english"]
         if len(normalize(word)) >= 3 and normalize(word).isalpha()
     }
+
+
+def valid_bomb_prompt(language: str, prompt: str) -> bool:
+    if len(prompt) != 2 or not prompt.isalpha() or prompt[0] == prompt[1]:
+        return False
+    if language != "pt":
+        return True
+    if any(letter in "aeiou" for letter in prompt):
+        return True
+    return prompt in PORTUGUESE_ALLOWED_CONSONANT_PROMPTS
 
 
 def bomb_prompt_stats(language: str) -> dict[str, dict[str, int]]:
@@ -374,6 +399,8 @@ def bomb_prompt_stats(language: str) -> dict[str, dict[str, int]]:
     for word in bomb_dictionary(language):
         for index in range(len(word) - 1):
             prompt = word[index:index + 2]
+            if not valid_bomb_prompt(language, prompt):
+                continue
             stats = frequency.setdefault(prompt, {"total": 0, "prefix": 0, "internal": 0})
             stats["total"] += 1
             stats["prefix" if index == 0 else "internal"] += 1
@@ -390,13 +417,11 @@ def build_bomb_prompts(language: str, difficulty: str) -> list[str]:
         prompt for prompt, stats in frequency.items()
         if stats["prefix"] >= 12
         and any(letter in "aeiou" for letter in prompt)
-        and prompt[0] != prompt[1]
         and prompt not in easy
     }
     hard = {
         prompt for prompt, stats in frequency.items()
         if stats["internal"] >= 18
-        and prompt[0] != prompt[1]
         and prompt not in easy
         and prompt not in medium
     }
@@ -555,6 +580,18 @@ def bomb_alive_players(bomb: dict) -> list[str]:
     ]
 
 
+def next_alive_after(bomb: dict, current: str | None, alive: list[str]) -> str:
+    order = [uid for uid in bomb.get("order", []) if uid in bomb.get("players", {})]
+    if not order:
+        return alive[0]
+    start = order.index(current) + 1 if current in order else 0
+    for offset in range(len(order)):
+        candidate = order[(start + offset) % len(order)]
+        if candidate in alive:
+            return candidate
+    return alive[0]
+
+
 def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> dict:
     alive = bomb_alive_players(bomb)
     if len(alive) <= 1:
@@ -565,8 +602,7 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
     bomb["round"] = bomb.get("round", 0) + 1
     bomb = update_bomb_progression(bomb)
     current = bomb.get("turn")
-    current_index = alive.index(current) if current in alive else -1
-    bomb["turn"] = alive[(current_index + 1) % len(alive)]
+    bomb["turn"] = next_alive_after(bomb, current, alive)
     if bomb.get("mode") == "word_chain":
         bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
         return bomb
