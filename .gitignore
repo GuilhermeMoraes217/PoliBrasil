@@ -1,7 +1,8 @@
 __pycache__/
+.codex-preview/
+flask_app.py
 *.pyc
 *.rar
-.codex-preview/
 .txt
 docs/.~lock.*#
 .DS_Store

@@ -14,12 +14,13 @@
 
 O **Poli English Duel** é uma plataforma web gamificada para prática de inglês por falantes de português brasileiro. O produto combina partidas multiplayer, feedback pedagógico imediato, progressão por XP e uma identidade visual retrô inspirada em terminais de desenvolvimento.
 
-O objetivo central é transformar o estudo de vocabulário em sessões curtas e competitivas. Em vez de apresentar listas estáticas, o jogo oferece quatro experiências:
+O objetivo central é transformar o estudo de vocabulário em sessões curtas e competitivas. Em vez de apresentar listas estáticas, o jogo oferece cinco experiências:
 
 - **Translation Rush:** tradução entre inglês e português sob limite de tempo.
 - **Syllable Strike:** formação de palavras inglesas a partir de uma sílaba.
 - **Word Radar:** descoberta colaborativa e competitiva de uma palavra secreta por proximidade semântica pedagógica.
 - **Word Bomb:** loop multiplayer de palavras com trecho obrigatório, lobby e digitação ao vivo.
+- **Word Chain:** corrente multiplayer em que a última sílaba válida vira requisito da próxima palavra.
 
 O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio do Firebase Authentication e mantém o estado competitivo sob controle do backend Python. Ranking, histórico, salas e tentativas são persistidos em SQLite.
 
@@ -46,12 +47,13 @@ O MVP está publicado no PythonAnywhere, utiliza autenticação Google por meio 
 | --- | --- |
 | Autenticação | Login e logout com Google via Firebase Authentication |
 | Identidade | Nome, UID, foto do usuário autenticado, faixa e nível |
-| Multiplayer | Criação de salas, entrada por código e atualização periódica do estado |
+| Multiplayer | Criação de salas, entrada por código e atualização via sinais Realtime |
 | Convites | Link copiável, compartilhamento pelo WhatsApp e retomada da entrada após login |
 | Translation Rush | Tradução alternada EN → PT-BR e PT-BR → EN |
 | Syllable Strike | Resposta com palavra inglesa iniciada pela sílaba exibida |
 | Word Radar | Sala multiplayer persistente com tentativas compartilhadas |
 | Word Bomb | Sala multiplayer para até oito participantes com lobby, turnos e digitação ao vivo |
+| Word Chain | Variante em corrente do Word Bomb com primeira palavra livre e sílaba herdada |
 | Progressão | Corações, XP, ranking global e histórico individual |
 | Feedback | Animações, sons opcionais, contador numérico e resposta correta após erro |
 | Conteúdo | Níveis, categorias, vocabulário curado e fallback FreeDict |
@@ -222,9 +224,19 @@ O **Word Bomb** adapta a dinâmica de loop de palavras para partidas multiplayer
 
 ### Arquitetura híbrida
 
-O Python continua autoritativo para lobby, participantes, início, turnos, validação, vidas, encerramento, XP e histórico. O Firebase Realtime Database transporta apenas o rascunho temporário digitado pelo jogador ativo. Esse dado não concede pontos e não altera o resultado da partida.
+O Python continua autoritativo para lobby, participantes, início, turnos, validação, vidas, encerramento, XP e histórico. O Firebase Realtime Database transporta rascunhos temporários de digitação e sinais leves de atualização para acordar salas, contextos e convites sem polling contínuo. Esses dados não concedem pontos e não alteram o resultado da partida.
 
 Para ampliar a aceitação de respostas sem sobrecarregar o espaço do PythonAnywhere, o backend também pode consultar blocos públicos de vocabulário particionados por idioma e prefixo no Realtime Database. Cada bloco é mantido em cache após a primeira consulta. A indisponibilidade do Firebase não interrompe a partida, pois a base local permanece como fallback.
+
+## 4.5 Word Chain
+
+O **Word Chain** reutiliza lobby, turnos, cronômetro, validação e ranking do Word Bomb, mas troca o trecho fixo por uma corrente pedagógica.
+
+- A primeira palavra é livre.
+- Após cada resposta válida, o backend calcula a sílaba final da palavra.
+- A próxima resposta precisa conter essa sílaba em qualquer posição.
+- Palavras repetidas são recusadas.
+- O Python continua autoritativo para validar vocabulário, pontuação, vidas e fim de partida.
 
 # 5. Gamificação
 
@@ -237,7 +249,7 @@ Nos duelos tradicionais, cada jogador começa com três corações. Uma resposta
 - Resposta correta em duelo tradicional: `100 XP`.
 - Word Radar: pontuação proporcional à proximidade.
 - Word Radar exato: pontos de proximidade mais bônus de `100 XP`.
-- Word Bomb: `100 XP` por palavra válida.
+- Word Bomb e Word Chain: `100 XP` por palavra válida.
 - Encerramento de duelo tradicional: atualização de ranking e histórico.
 - Vitória em duelo tradicional: bônus adicional no cálculo persistido do ranking.
 
@@ -268,11 +280,11 @@ O jogo possui efeitos sonoros opcionais gerados no navegador. O estado de áudio
 
 O usuário também pode selecionar trilhas instrumentais leves `lounge_01()` e `lounge_02()` ou manter `music_off()`. As melodias são sintetizadas no navegador, sem arquivos de áudio adicionais, e a preferência também é persistida localmente.
 
-O `Word Bomb` sintetiza efeitos próprios para resposta correta, resposta inválida, explosão por timeout e vitória. Cada evento é reproduzido uma única vez, mesmo com a atualização periódica do estado multiplayer.
+O `Word Bomb` e o `Word Chain` sintetizam efeitos próprios para resposta correta, resposta inválida, explosão por timeout e vitória. Cada evento é reproduzido uma única vez, mesmo quando o estado multiplayer é atualizado por sinais Realtime.
 
 ## 5.6 Revanche
 
-Após um duelo tradicional, um jogador pode solicitar uma revanche. O oponente recebe um modal explícito para aceitar ou recusar, tanto na tela final quanto no menu inicial. Se aceitar depois de o solicitante retornar ao menu, o polling retoma a sala reaberta automaticamente para os dois jogadores.
+Após um duelo tradicional, um jogador pode solicitar uma revanche. O oponente recebe um modal explícito para aceitar ou recusar, tanto na tela final quanto no menu inicial. Se aceitar depois de o solicitante retornar ao menu, um sinal Realtime acorda o jogador e a sala reaberta é retomada automaticamente.
 
 # 6. Conteúdo pedagógico
 
@@ -342,11 +354,11 @@ app.py / Flask / WSGI
   v
 server.py / regras autoritativas do jogo
   |
-  +--> SQLite: salas, Word Radar, Word Bomb, ranking e histórico
+  +--> SQLite: salas, Word Radar, Word Bomb, Word Chain, ranking e histórico
   |
   +--> Firebase Identity Toolkit: validação do token do usuário
   |
-  +--> Firebase Realtime Database: digitação temporária ao vivo do Word Bomb
+  +--> Firebase Realtime Database: digitação temporária ao vivo e sinais leves de atualização
 ```
 
 ## 7.2 Frontend
@@ -400,7 +412,7 @@ O arquivo `data/poli.db` é criado automaticamente e contém quatro tabelas.
 | --- | --- |
 | `rooms` | Estado serializado dos duelos Translation Rush e Syllable Strike |
 | `contexts` | Estado serializado das salas Word Radar |
-| `bombs` | Lobby e estado competitivo autoritativo das salas Word Bomb |
+| `bombs` | Lobby e estado competitivo autoritativo das salas Word Bomb e Word Chain |
 | `rankings` | XP, vitórias, derrotas e partidas por usuário |
 | `history` | Histórico individual de duelos concluídos |
 
@@ -436,7 +448,7 @@ Credenciais administrativas, chaves privadas e `client secret` OAuth não são e
 
 ## 8.3 Realtime Database
 
-O Firebase Realtime Database não recebe estado competitivo. No Word Bomb, ele transmite somente a digitação temporária ao vivo. Cada usuário autenticado pode escrever ou apagar apenas o próprio rascunho, limitado a 64 caracteres. O banco também expõe publicamente os blocos estáticos de vocabulário amplo:
+O Firebase Realtime Database não recebe estado competitivo. No Word Bomb e no Word Chain, ele transmite a digitação temporária ao vivo. Ele também carrega sinais leves de atualização em `liveRooms`, `liveContexts`, `liveUsers` e `liveBombRooms` para substituir chamadas repetitivas de polling. Cada usuário autenticado pode escrever ou apagar apenas o próprio rascunho, limitado a 64 caracteres. O banco também expõe publicamente os blocos estáticos de vocabulário amplo:
 
 ```json
 {
@@ -737,7 +749,7 @@ git diff --check
 
 # 16. Conclusão
 
-O **Poli English Duel** saiu de uma ideia de duelo de traduções para um MVP online com três modos, autenticação, persistência, ranking, histórico, conteúdo ampliado e uma arquitetura preparada para evoluir.
+O **Poli English Duel** saiu de uma ideia de duelo de traduções para um MVP online com cinco modos, autenticação, persistência, ranking, histórico, conteúdo ampliado e uma arquitetura preparada para evoluir.
 
 O desenho atual privilegia simplicidade operacional e proteção das regras competitivas. A interface permanece leve, o backend mantém autoridade sobre os resultados e a base pedagógica pode crescer de forma incremental.
 

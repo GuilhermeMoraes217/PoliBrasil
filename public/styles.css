@@ -78,13 +78,14 @@ h1 span { color: var(--green); }
 .cursor { animation: blink .8s steps(2) infinite; color: var(--green); }
 .section-heading { align-items: end; border-top: 1px solid var(--line); display: flex; justify-content: space-between; margin-top: 65px; padding-top: 35px; }
 .section-heading h2 { font-size: 19px; }.section-heading span { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
-.mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); margin-top: 25px; }
+.mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 25px; }
 .mode-card { background: var(--panel); border: 1px solid var(--line); padding: 24px; position: relative; transition: .2s ease; }
 .mode-card:hover { background: var(--panel-2); transform: translateY(-5px); box-shadow: var(--shadow); }
 .mode-card::before { content: ""; height: 3px; left: 0; position: absolute; top: 0; width: 100%; }
 .mode-card.green::before { background: var(--green); }.mode-card.purple::before { background: var(--purple); }
 .mode-card.amber::before { background: #f4c95d; }.amber .pixel-icon, .amber .text-button { color: #f4c95d; }
 .mode-card.cyan::before { background: #67e8f9; }.cyan .pixel-icon, .cyan .text-button { color: #67e8f9; }
+.mode-card.rose::before { background: #ff9fcb; }.rose .pixel-icon, .rose .text-button { color: #ff9fcb; }
 .mode-top { color: var(--muted); display: flex; font-size: 10px; justify-content: space-between; letter-spacing: 2px; }
 .mode-top i { border: 1px solid var(--line); font-style: normal; padding: 4px 6px; }
 .pixel-icon { color: var(--green); font-family: "Press Start 2P"; font-size: 32px; margin: 42px 0 23px; }

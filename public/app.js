@@ -21,6 +21,7 @@ const state = {
   bombSignalUnsubscribe: null,
   lastBombSignal: null,
   bombRefreshInFlight: false,
+  selectedBombMode: "word_bomb",
   bombTypingValue: "",
   bombTypingByUid: {},
   lastBombFeedback: null,
@@ -96,6 +97,7 @@ function bindInterface() {
   $("#leave-context").addEventListener("click", leaveContext);
   $("#context-form").addEventListener("submit", submitContextWord);
   $("#open-bomb").addEventListener("click", openBombModal);
+  $("#open-chain").addEventListener("click", openChainModal);
   $("#create-bomb").addEventListener("click", createBomb);
   $("#join-bomb").addEventListener("click", joinBomb);
   $("#bomb-ready").addEventListener("click", toggleBombReady);
@@ -457,8 +459,26 @@ function leaveContext() {
 
 async function openBombModal() {
   if (!requireGoogleLogin()) return;
+  configureBombModal("word_bomb");
   $("#bomb-modal").showModal();
   await loadOpenBombs();
+}
+
+async function openChainModal() {
+  if (!requireGoogleLogin()) return;
+  configureBombModal("word_chain");
+  $("#bomb-modal").showModal();
+  await loadOpenBombs();
+}
+
+function configureBombModal(mode) {
+  state.selectedBombMode = mode;
+  const chain = mode === "word_chain";
+  $("#bomb-modal-eyebrow").textContent = chain ? "// START_WORD_CHAIN" : "// START_WORD_BOMB";
+  $("#bomb-modal-title").textContent = chain ? "WORD CHAIN" : "WORD BOMB";
+  $("#bomb-modal-note").textContent = chain
+    ? "A primeira palavra e livre. Depois, cada resposta precisa conter a ultima silaba da palavra anterior."
+    : "A partida comeca em EASY 1 e aumenta o nivel automaticamente a cada 5-7 rodadas.";
 }
 
 async function loadOpenBombs() {
@@ -470,7 +490,7 @@ async function loadOpenBombs() {
       ${bombs.map((bomb) => `
         <button class="context-room" type="button" data-bomb-code="${bomb.code}">
           <b>#${bomb.code}</b>
-          <span>${bomb.players} PLAYERS · ${bomb.language.toUpperCase()} · ${bombLevelLabel(bomb)} · ${bomb.status.toUpperCase()}</span>
+          <span>${bomb.players} PLAYERS · ${bombGameLabel(bomb)} · ${bomb.language.toUpperCase()} · ${bombLevelLabel(bomb)} · ${bomb.status.toUpperCase()}</span>
         </button>
       `).join("")}
     ` : "";
@@ -482,7 +502,7 @@ async function loadOpenBombs() {
 
 async function createBomb() {
   try {
-    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value } });
+    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value, mode: state.selectedBombMode } });
     $("#bomb-modal").close();
     enterBomb(bomb);
   } catch (error) {
@@ -554,6 +574,7 @@ async function refreshBomb(options = {}) {
 function renderBomb() {
   const bomb = state.bomb;
   if (!bomb) return;
+  const chain = isWordChain(bomb);
   const players = bomb.order.map((uid) => bomb.players[uid]).filter(Boolean);
   const activePlayer = bomb.players[bomb.turn];
   const me = bomb.players[state.user.uid];
@@ -562,9 +583,14 @@ function renderBomb() {
   const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
   $("#bomb-screen").classList.toggle("waiting", waiting);
   $("#bomb-screen").classList.toggle("finished", finished);
+  if (!finished) {
+    $("#bomb-finish-panel").classList.add("hidden");
+    state.lastBombFinish = null;
+  }
+  $("#bomb-screen-title").textContent = `${chain ? "WORD_CHAIN" : "WORD_BOMB"} · MULTIPLAYER`;
   $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
-  $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar Word Bomb no Poli English Duel? ${bombInviteUrl()}`)}`;
+  $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar ${chain ? "Word Chain" : "Word Bomb"} no Poli English Duel? ${bombInviteUrl()}`)}`;
   const playerCard = (player, index) => `
     <div class="bomb-player ${player.uid === bomb.turn ? "active" : ""} ${player.hearts <= 0 ? "out" : ""}">
       <span class="bomb-position">${String(index + 1).padStart(2, "0")}</span>
@@ -601,10 +627,15 @@ function renderBomb() {
   $("#bomb-turn-arrow").style.transform = `rotate(${activeAngle}deg)`;
   $("#bomb-turn-arrow").classList.toggle("hidden", bomb.status !== "playing");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
-  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : bomb.prompt;
-  $("#bomb-live-label").textContent = waiting ? "Todos marcam pronto. O host inicia a partida." : `${activePlayer?.name || "PLAYER"} digita uma palavra ao vivo:`;
+  const requiredChain = bomb.requiredSyllable || bomb.requiredStart;
+  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : chain ? (requiredChain ? requiredChain.toUpperCase() : "ANY") : bomb.prompt;
+  $("#bomb-live-label").textContent = waiting
+    ? (chain ? "Todos marcam pronto. A primeira palavra sera livre." : "Todos marcam pronto. O host inicia a partida.")
+    : chain
+      ? `${activePlayer?.name || "PLAYER"} precisa usar ${requiredChain ? requiredChain.toUpperCase() : "qualquer silaba"}${bomb.lastWord ? ` depois de ${bomb.lastWord}` : ""}:`
+      : `${activePlayer?.name || "PLAYER"} digita uma palavra ao vivo:`;
   $("#bomb-input").disabled = !canAnswer;
-  $("#bomb-input").placeholder = canAnswer ? "digite_a_palavra_completa..." : "aguarde_seu_turno...";
+  $("#bomb-input").placeholder = canAnswer ? (chain ? "digite_uma_palavra_da_corrente..." : "digite_a_palavra_completa...") : "aguarde_seu_turno...";
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
   $("#bomb-live-typing").textContent = bomb.status === "playing" && liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
@@ -614,7 +645,7 @@ function renderBomb() {
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
   $("#bomb-start").disabled = !allReady;
   $("#bomb-rematch").classList.toggle("hidden", bomb.status !== "finished");
-  if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host já pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
+  if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host ja pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
   if (bomb.lastFeedback) renderBombFeedback(bomb.lastFeedback);
   if (bomb.status === "playing") {
     startBombTimer();
@@ -628,11 +659,14 @@ function renderBomb() {
 
 function renderBombFeedback(feedback) {
   const element = $("#bomb-feedback");
+  const chain = isWordChain(state.bomb);
   const actor = state.bomb.players[feedback.uid]?.name || "PLAYER";
   const isNewFeedback = feedback.id !== state.lastBombFeedback;
   if (isNewFeedback) state.lastBombFeedback = feedback.id;
   if (feedback.kind === "correct") {
-    element.textContent = `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
+    element.textContent = chain
+      ? `${actor} conectou ${feedback.answer}. Proxima silaba: ${(feedback.nextSyllable || feedback.nextStart || "").toUpperCase()}. +${feedback.xp} XP`
+      : `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
     element.className = "feedback correct";
     if (isNewFeedback) playSound("correct");
   } else if (feedback.kind === "timeout") {
@@ -641,6 +675,10 @@ function renderBombFeedback(feedback) {
     if (isNewFeedback) playSound("explosion");
   } else if (feedback.kind === "duplicate") {
     element.textContent = `${actor} tentou repetir ${feedback.answer}. Essa palavra ja foi usada.`;
+    element.className = "feedback wrong";
+    if (isNewFeedback) playSound("wrong");
+  } else if (feedback.kind === "missing_syllable" || feedback.kind === "wrong_start") {
+    element.textContent = `${actor} escreveu ${feedback.answer}, mas precisava conter ${(feedback.required || "").toUpperCase()}.`;
     element.className = "feedback wrong";
     if (isNewFeedback) playSound("wrong");
   } else {
@@ -668,13 +706,26 @@ function playerPosition(index, total, compact = false) {
 }
 
 function bombLevelLabel(bomb) {
+  if (isWordChain(bomb)) return "CHAIN";
   return `${(bomb.difficulty || "easy").toUpperCase()} ${bomb.sublevel || 1}`;
 }
 
 function bombLevelProgressLabel(bomb) {
+  if (isWordChain(bomb)) {
+    const required = bomb.requiredSyllable || bomb.requiredStart;
+    return required ? `USE_${required.toUpperCase()}` : "FIRST_WORD_FREE";
+  }
   if (bomb.difficulty === "hard" && bomb.sublevel === 3) return "MAX_LEVEL";
   const remaining = Math.max(0, Number(bomb.progression?.nextLevelAt || 0) - Number(bomb.round || 0));
   return `UP_IN_${remaining}_ROUNDS`;
+}
+
+function isWordChain(bomb) {
+  return bomb?.mode === "word_chain";
+}
+
+function bombGameLabel(bomb) {
+  return isWordChain(bomb) ? "WORD_CHAIN" : "WORD_BOMB";
 }
 
 function startBombTimer() {
@@ -817,10 +868,11 @@ async function clearBombTyping() {
 function renderBombFinished() {
   const winner = state.bomb.players[state.bomb.winner];
   const finishKey = `${state.bomb.code}:${state.bomb.winner || "draw"}:${state.bomb.finishReason || "finished"}`;
+  const chain = isWordChain(state.bomb);
   $("#bomb-prefix").textContent = "GG";
   $("#bomb-live-typing").textContent = "";
   $("#bomb-input").value = "";
-  $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o WORD BOMB!` : "Partida encerrada.";
+  $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o ${chain ? "WORD CHAIN" : "WORD BOMB"}!` : "Partida encerrada.";
   $("#bomb-feedback").className = "feedback correct";
   $("#bomb-finish-panel").classList.remove("hidden");
   $("#bomb-finish-title").textContent = winner ? `${winner.name} venceu!` : "Partida encerrada";
@@ -1235,12 +1287,13 @@ function requireGoogleLogin() {
 function openInvite() {
   const code = new URLSearchParams(location.search).get("room");
   const bombCode = new URLSearchParams(location.search).get("bomb");
+  const chainCode = new URLSearchParams(location.search).get("chain");
   if (code) {
     $("#join-code").value = code.toUpperCase();
     $("#join-modal").showModal();
   }
-  if (bombCode) {
-    state.pendingBombJoinCode = bombCode.toUpperCase();
+  if (bombCode || chainCode) {
+    state.pendingBombJoinCode = (bombCode || chainCode).toUpperCase();
     if (isGoogleUser()) completePendingBombJoin();
     else toast("Faça login com Google para entrar diretamente no lobby");
   }
@@ -1275,12 +1328,12 @@ async function copyInvite() {
 }
 
 function bombInviteUrl() {
-  return `${location.origin}${location.pathname}?bomb=${state.bomb?.code || "------"}`;
+  return `${location.origin}${location.pathname}?${isWordChain(state.bomb) ? "chain" : "bomb"}=${state.bomb?.code || "------"}`;
 }
 
 async function copyBombInvite() {
   await navigator.clipboard.writeText(bombInviteUrl());
-  toast("Link do Word Bomb copiado");
+  toast(`Link do ${isWordChain(state.bomb) ? "Word Chain" : "Word Bomb"} copiado`);
 }
 
 function currentPlayer() {

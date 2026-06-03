@@ -64,6 +64,7 @@ O PythonAnywhere importa `app.py` via WSGI. Não execute `python server.py` em p
 - Duelo de tradução e duelo de palavras por sílaba.
 - Modo multiplayer persistente `Word Radar`: descubra palavras inglesas por aproximação e aprenda traduções durante as tentativas.
 - Modo multiplayer `Word Bomb`: sala para até oito jogadores, lobby com confirmação de pronto, início controlado pelo host, sílaba em qualquer parte da palavra, níveis pedagógicos e digitação ao vivo via Firebase Realtime Database.
+- Modo multiplayer `Word Chain`: variante em corrente na qual a primeira palavra é livre e as seguintes precisam conter a última sílaba da palavra anterior.
 - Timer de 10 segundos, três corações e XP.
 - Dificuldades `easy`, `medium` e `hard`.
 - Categorias: cotidiano, viagens, trabalho e tecnologia.
@@ -77,6 +78,8 @@ No `Word Bomb`, o host escolhe somente o idioma. A dificuldade cresce durante a 
 No `Word Bomb`, palavras ja usadas na mesma partida recebem feedback explicito de repeticao. Quando o tempo do jogador estoura, o campo de digitacao dele e limpo antes da proxima rodada.
 
 A arena compacta do `Word Bomb` adapta seu conteúdo ao estado da partida: o lobby usa uma lista enxuta de participantes e não exibe bomba nem cronômetro; a rodada ativa usa a largura disponível e um raio responsivo para afastar os jogadores do centro sem deixar cards vazarem do painel; o encerramento mostra um painel final com placar. A seta segmentada fica atrás da bomba e dos cards. O navegador sintetiza efeitos distintos para acerto, erro, explosão por timeout e vitória.
+
+O `Word Chain` usa a mesma estrutura multiplayer do `Word Bomb`, mas troca a sílaba fixa por uma corrente pedagógica: após cada palavra válida, o backend calcula a sílaba final e exige que a próxima resposta contenha essa sílaba. Palavras repetidas são recusadas e a validação continua autoritativa no Python.
 
 No `Word Radar`, o backend mantém a palavra secreta oculta. O jogador pode criar uma sala, retomar uma sala aberta ou entrar em uma existente, digitar uma palavra em português para receber uma sugestão inglesa e competir por XP com outras pessoas. A distância pedagógica considera tema, nível e semelhança lexical dentro da base curada: quanto menor o número, mais perto da resposta. Ao chegar em `0`, o jogador recebe bônus e vence a sala.
 
@@ -116,13 +119,13 @@ https://poligbrasil-2022-default-rtdb.firebaseio.com/
 - `scripts/build_firebase_bomb_vocabulary.py`: gera o payload remoto particionado do Word Bomb.
 - `data/poli.db`: banco SQLite criado automaticamente pelo servidor.
 - `public/`: frontend HTML, CSS e JavaScript.
-- `firebase.rules.json`: libera somente o texto temporário digitado no `Word Bomb`; estado competitivo permanece bloqueado.
+- `firebase.rules.json`: libera sinais Realtime e texto temporário digitado; estado competitivo permanece bloqueado.
 
 ## Arquitetura
 
 O Firebase Authentication identifica os jogadores. O Python valida o token Firebase e processa as ações competitivas. Ranking, histórico e salas ficam no SQLite do servidor.
 
-O navegador não grava partidas diretamente no Realtime Database. Isso impede que alguém altere XP, corações ou respostas pelo DevTools. No `Word Bomb`, o Firebase transmite apenas o rascunho temporário de digitação do próprio usuário autenticado. Em uma implantação futura com múltiplas instâncias do backend, o SQLite pode ser substituído pelo Firebase Admin SDK ou por outro banco centralizado sem expor credenciais administrativas no navegador.
+O navegador não grava partidas diretamente no Realtime Database. Isso impede que alguém altere XP, corações ou respostas pelo DevTools. O Firebase transmite rascunhos temporários de digitação e sinais leves de atualização para acordar salas, contextos e convites sem polling contínuo. Em uma implantação futura com múltiplas instâncias do backend, o SQLite pode ser substituído pelo Firebase Admin SDK ou por outro banco centralizado sem expor credenciais administrativas no navegador.
 
 ## Vocabulário
 

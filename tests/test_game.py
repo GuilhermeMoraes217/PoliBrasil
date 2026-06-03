@@ -239,6 +239,47 @@ class GameEngineTest(unittest.TestCase):
         self.assertTrue(accepted)
         self.assertEqual(bomb["turn"], "two")
 
+    def test_word_chain_first_answer_sets_next_required_syllable(self):
+        bomb = {
+            "code": "CHAIN1", "mode": "word_chain", "status": "playing", "language": "en",
+            "round": 1, "turn": "one", "requiredSyllable": None, "lastWord": None,
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()},
+            "order": ["one", "two"], "usedWords": {},
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "banana")
+        self.assertTrue(accepted)
+        self.assertEqual(bomb["requiredSyllable"], "na")
+        self.assertEqual(bomb["lastWord"], "banana")
+        self.assertEqual(bomb["players"]["one"]["score"], 100)
+        self.assertEqual(bomb["turn"], "two")
+
+    def test_word_chain_rejects_missing_required_syllable_without_losing_turn(self):
+        bomb = {
+            "code": "CHAIN1", "mode": "word_chain", "status": "playing", "language": "en",
+            "round": 2, "turn": "two", "requiredSyllable": "na", "lastWord": "banana",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()},
+            "order": ["one", "two"], "usedWords": {"banana": True},
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "two", "table")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["turn"], "two")
+        self.assertEqual(bomb["players"]["two"]["hearts"], 3)
+        self.assertEqual(bomb["lastFeedback"]["kind"], "missing_syllable")
+
+    def test_word_chain_rejects_repeated_word(self):
+        bomb = {
+            "code": "CHAIN1", "mode": "word_chain", "status": "playing", "language": "en",
+            "round": 2, "turn": "two", "requiredSyllable": "na", "lastWord": "banana",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()},
+            "order": ["one", "two"], "usedWords": {"banana": True},
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "two", "banana")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["lastFeedback"]["kind"], "duplicate")
+
     def test_word_bomb_invalid_word_keeps_turn_until_timeout(self):
         bomb = {
             "code": "BOMB01", "status": "playing", "language": "en", "round": 1, "turn": "one", "prompt": "oo",

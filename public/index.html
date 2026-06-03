@@ -62,7 +62,7 @@
 
         <div class="section-heading">
           <div><p class="eyebrow">// SELECT_GAME_MODE</p><h2>ESCOLHA SEU DESAFIO</h2></div>
-          <span>4 MODOS DISPONÍVEIS</span>
+          <span>5 MODOS DISPONÍVEIS</span>
         </div>
         <div class="mode-grid">
           <article class="mode-card green">
@@ -92,6 +92,13 @@
             <h3>WORD<br>BOMB</h3>
             <p>Entre no loop, fique pronto e responda palavras com o trecho exibido antes que o tempo acabe.</p>
             <button id="open-bomb" class="text-button">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+          <article class="mode-card rose">
+            <div class="mode-top"><span>MODE_05</span><i>CHAIN</i></div>
+            <div class="pixel-icon">A<span>→</span>Z</div>
+            <h3>WORD<br>CHAIN</h3>
+            <p>Use a última sílaba da palavra anterior em qualquer parte da próxima resposta.</p>
+            <button id="open-chain" class="text-button">JOGAR ESTE MODO <b>→</b></button>
           </article>
         </div>
         <div class="dashboard-grid">
@@ -192,7 +199,7 @@
       <section id="bomb-screen" class="screen">
         <div class="battle-top">
           <button class="back-button" id="leave-bomb">← voltar_ao_menu</button>
-          <span>WORD_BOMB · MULTIPLAYER</span>
+          <span id="bomb-screen-title">WORD_BOMB · MULTIPLAYER</span>
           <span id="bomb-meta">ROOM #------ · ENGLISH</span>
         </div>
         <div class="bomb-layout">
@@ -308,14 +315,14 @@
 
     <dialog id="bomb-modal" class="modal">
       <button class="close-modal" aria-label="Fechar">×</button>
-      <p class="eyebrow">// START_WORD_BOMB</p>
-      <h2>WORD BOMB</h2>
+      <p id="bomb-modal-eyebrow" class="eyebrow">// START_WORD_BOMB</p>
+      <h2 id="bomb-modal-title">WORD BOMB</h2>
       <label>IDIOMA DAS PALAVRAS</label>
       <select id="bomb-language" class="category-choice">
         <option value="en">INGLÊS</option>
         <option value="pt">PORTUGUÊS</option>
       </select>
-      <p class="muted">A partida começa em EASY 1 e aumenta o nível automaticamente a cada 5–7 rodadas.</p>
+      <p id="bomb-modal-note" class="muted">A partida começa em EASY 1 e aumenta o nível automaticamente a cada 5–7 rodadas.</p>
       <button id="create-bomb" class="button primary wide">CRIAR NOVA SALA</button>
       <div id="bomb-open-rooms" class="context-open-rooms"></div>
       <label for="bomb-join-code">OU ENTRE EM UMA SALA</label>

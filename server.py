@@ -23,7 +23,6 @@ PUBLIC = ROOT / "public"
 DATA = ROOT / "data" / "vocabulary.json"
 FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
-FIREBASE_API_KEY = "AIzaSyBcsiGC1h_tBTJrlb2CE5DWxHVtFUimWPE"
 FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
 BOMB_MAX_PLAYERS = 8
@@ -42,6 +41,21 @@ TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
 ALLOW_DEMO = os.getenv("POLI_ALLOW_DEMO", "").lower() in {"1", "true", "yes"}
 REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() not in {"0", "false", "no"}
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
+
+
+def load_firebase_api_key() -> str:
+    configured_key = os.getenv("POLI_FIREBASE_API_KEY", "").strip()
+    if configured_key:
+        return configured_key
+    config_file = PUBLIC / "firebase-config.js"
+    config_text = config_file.read_text(encoding="utf-8")
+    match = re.search(r'apiKey:\s*"([^"]+)"', config_text)
+    if not match:
+        raise RuntimeError("Configure POLI_FIREBASE_API_KEY or public/firebase-config.js.")
+    return match.group(1)
+
+
+FIREBASE_API_KEY = load_firebase_api_key()
 
 with DATA.open(encoding="utf-8") as vocabulary_file:
     VOCABULARY = json.load(vocabulary_file)
@@ -449,6 +463,40 @@ def bomb_word_exists(language: str, word: str) -> bool:
     return word in BOMB_WORDS[language] or word in remote_bomb_words(language, word[:2])
 
 
+def chain_final_syllable(word: str) -> str:
+    normalized = normalize(word)
+    vowels = "aeiou"
+    if len(normalized) <= 2:
+        return normalized
+    last_vowel = max((index for index, char in enumerate(normalized) if char in vowels), default=-1)
+    if last_vowel < 0:
+        return normalized[-2:]
+    vowel_group_start = last_vowel
+    while vowel_group_start > 0 and normalized[vowel_group_start - 1] in vowels:
+        vowel_group_start -= 1
+    vowel_group_end = last_vowel
+    while vowel_group_end + 1 < len(normalized) and normalized[vowel_group_end + 1] in vowels:
+        vowel_group_end += 1
+    if vowel_group_end - vowel_group_start + 1 > 2:
+        vowel_group_start = vowel_group_end - 1
+    previous_vowel = max((index for index, char in enumerate(normalized[:vowel_group_start]) if char in vowels), default=-1)
+    onset_cluster = normalized[previous_vowel + 1:vowel_group_start] if previous_vowel >= 0 else ""
+    coda = normalized[vowel_group_end + 1:]
+    allowed_onsets = {
+        "br", "cr", "dr", "fr", "gr", "pr", "tr", "vr",
+        "bl", "cl", "fl", "gl", "pl", "tl", "ch", "lh", "nh", "qu", "gu",
+    }
+    if not onset_cluster:
+        onset = ""
+    elif len(onset_cluster) >= 2 and onset_cluster[-2:] in allowed_onsets:
+        onset = onset_cluster[-2:]
+    else:
+        onset = onset_cluster[-1]
+    if previous_vowel < 0 and normalized[:vowel_group_start]:
+        onset = ""
+    return f"{onset}{normalized[vowel_group_start:vowel_group_end + 1]}{coda}"
+
+
 def public_bomb(bomb: dict) -> dict:
     public = json.loads(json.dumps(bomb))
     public["serverNow"] = now_ms()
@@ -468,7 +516,7 @@ def record_bomb_ranking(database: sqlite3.Connection, bomb: dict) -> dict:
         update_ranking(database, player, won)
         database.execute(
             "INSERT INTO history(uid, room_code, opponent, mode, result, xp, played_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (player["uid"], bomb["code"], "WORD_BOMB", "word_bomb", "win" if won else "loss", player.get("score", 0), now_ms()),
+            (player["uid"], bomb["code"], "WORD_CHAIN" if bomb.get("mode") == "word_chain" else "WORD_BOMB", bomb.get("mode", "word_bomb"), "win" if won else "loss", player.get("score", 0), now_ms()),
         )
     bomb["rankingRecorded"] = True
     return bomb
@@ -500,6 +548,9 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
     current = bomb.get("turn")
     current_index = alive.index(current) if current in alive else -1
     bomb["turn"] = alive[(current_index + 1) % len(alive)]
+    if bomb.get("mode") == "word_chain":
+        bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+        return bomb
     prompts = BOMB_SUBLEVEL_PROMPTS[bomb["language"]][bomb["difficulty"]][bomb["sublevel"]]
     if not prompts:
         prompts = BOMB_PROMPTS[bomb["language"]][bomb["difficulty"]]
@@ -513,9 +564,36 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
     return bomb
 
 
+def apply_chain_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer: str) -> tuple[dict, bool]:
+    del database
+    normalized = normalize(answer)
+    if normalized in bomb.setdefault("usedWords", {}):
+        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "duplicate", "answer": normalized}
+        return bomb, False
+    required = bomb.get("requiredSyllable") or bomb.get("requiredStart")
+    if required and required not in normalized:
+        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "missing_syllable", "answer": normalized, "required": required}
+        return bomb, False
+    if len(normalized) < 3 or not normalized.isalpha() or not bomb_word_exists(bomb["language"], normalized):
+        bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "invalid", "answer": normalized}
+        return bomb, False
+    bomb["usedWords"][normalized] = True
+    bomb["lastWord"] = normalized
+    bomb["requiredSyllable"] = chain_final_syllable(normalized)
+    bomb.pop("requiredStart", None)
+    bomb["players"][uid]["score"] = bomb["players"][uid].get("score", 0) + 100
+    bomb["lastFeedback"] = {
+        "id": now_ms(), "uid": uid, "kind": "correct", "answer": normalized,
+        "xp": 100, "nextSyllable": bomb["requiredSyllable"],
+    }
+    return next_bomb_turn(bomb), True
+
+
 def apply_bomb_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer: str) -> tuple[dict, bool]:
     if bomb["status"] != "playing" or bomb.get("turn") != uid:
         return bomb, False
+    if bomb.get("mode") == "word_chain":
+        return apply_chain_answer(database, bomb, uid, answer)
     normalized = normalize(answer)
     if normalized in bomb.setdefault("usedWords", {}):
         bomb["lastFeedback"] = {"id": now_ms(), "uid": uid, "kind": "duplicate", "answer": normalized}
@@ -539,7 +617,7 @@ def advance_bomb(database: sqlite3.Connection, bomb: dict) -> dict:
         return bomb
     player = bomb["players"][bomb["turn"]]
     player["hearts"] = max(0, player.get("hearts", 0) - 1)
-    bomb["lastFeedback"] = {"id": now_ms(), "uid": player["uid"], "kind": "timeout", "answer": bomb["prompt"]}
+    bomb["lastFeedback"] = {"id": now_ms(), "uid": player["uid"], "kind": "timeout", "answer": bomb.get("requiredSyllable") or bomb.get("requiredStart") or bomb.get("prompt", "")}
     return next_bomb_turn(bomb, database)
 
 
@@ -656,8 +734,11 @@ class PoliHandler(SimpleHTTPRequestHandler):
 
     def create_bomb(self, user: dict, payload: dict):
         language = payload.get("language", "en")
+        mode = payload.get("mode", "word_bomb")
         if language not in {"en", "pt"}:
             return self.send_json({"error": "Idioma invalido"}, status=400)
+        if mode not in {"word_bomb", "word_chain"}:
+            return self.send_json({"error": "Modo invalido"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             code = random_code()
             while read_bomb(database, code):
@@ -665,10 +746,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
             player = self.player_from_user(user)
             player["ready"] = False
             bomb = {
-                "code": code, "owner": user["uid"], "language": language, "difficulty": "easy", "sublevel": 1, "status": "waiting",
+                "code": code, "owner": user["uid"], "mode": mode, "language": language, "difficulty": "easy", "sublevel": 1, "status": "waiting",
                 "createdAt": now_ms(), "round": 0, "players": {user["uid"]: player}, "order": [user["uid"]],
                 "usedWords": {}, "usedPrompts": [], "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
             }
+            if mode == "word_chain":
+                bomb.update({"lastWord": None, "requiredSyllable": None})
             write_bomb(database, bomb)
         return self.send_json({"bomb": public_bomb(bomb)}, status=201)
 
@@ -742,7 +825,12 @@ class PoliHandler(SimpleHTTPRequestHandler):
         error = None
         if not accepted:
             feedback = bomb.get("lastFeedback", {})
-            error = "Esta palavra ja foi usada nesta partida." if feedback.get("kind") == "duplicate" else "Palavra invalida. Tente novamente antes do tempo acabar."
+            if feedback.get("kind") == "duplicate":
+                error = "Esta palavra ja foi usada nesta partida."
+            elif feedback.get("kind") == "missing_syllable":
+                error = f"A palavra precisa conter a silaba {feedback.get('required', '').upper()}."
+            else:
+                error = "Palavra invalida. Tente novamente antes do tempo acabar."
         return self.send_json({"bomb": public_bomb(bomb), "error": error}, status=status)
 
     def leave_bomb(self, code: str, user: dict, payload: dict):
@@ -782,6 +870,8 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 "winner": None, "finishReason": None, "lastFeedback": None, "deadline": now_ms(),
                 "difficulty": "easy", "sublevel": 1, "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
             })
+            if bomb.get("mode") == "word_chain":
+                bomb.update({"lastWord": None, "requiredSyllable": None})
             bomb.pop("rankingRecorded", None)
             for player in bomb["players"].values():
                 player.update({"hearts": 3, "score": 0, "ready": False})
@@ -796,7 +886,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             bomb = json.loads(row["payload"])
             if bomb.get("status") in {"waiting", "playing"} and uid in bomb.get("players", {}):
                 bombs.append({
-                    "code": bomb["code"], "language": bomb["language"], "difficulty": bomb.get("difficulty", "easy"),
+                    "code": bomb["code"], "mode": bomb.get("mode", "word_bomb"), "language": bomb["language"], "difficulty": bomb.get("difficulty", "easy"),
                     "sublevel": bomb.get("sublevel", 1), "status": bomb["status"],
                     "players": len(bomb["players"]), "createdAt": bomb["createdAt"],
                 })
