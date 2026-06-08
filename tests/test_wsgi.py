@@ -138,7 +138,8 @@ class WsgiAppTest(unittest.TestCase):
             )
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json["bomb"]["mode"], "pop_cards")
-        self.assertIsNone(created.json["bomb"]["challenge"])
+        self.assertIsNone(created.json["bomb"]["activeCard"])
+        self.assertEqual(created.json["bomb"]["phase"], "waiting_card")
 
     def test_word_bomb_rematch_returns_everyone_to_lobby(self):
         bomb = {

@@ -2,6 +2,14 @@ const config = window.POLI_FIREBASE_CONFIG || {};
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const ROUND_MS = 10000;
+const POP_CARD_ROULETTE = [
+  { icon: "♪", title: "Cantora famosa", category: "cultura_pop" },
+  { icon: "▶", title: "Filme famoso", category: "entretenimento" },
+  { icon: "TV", title: "Serie famosa", category: "entretenimento" },
+  { icon: "⌘", title: "Empresa de tecnologia", category: "tecnologia" },
+  { icon: "</>", title: "Linguagem de programacao", category: "tecnologia" },
+  { icon: "✦", title: "Game famoso", category: "entretenimento" },
+];
 
 const state = {
   auth: null,
@@ -24,6 +32,8 @@ const state = {
   selectedBombMode: "word_bomb",
   bombTypingValue: "",
   bombTypingByUid: {},
+  lastPopCardId: null,
+  popCardRollTimer: null,
   lastBombFeedback: null,
   lastBombFinish: null,
   roomSignalUnsubscribe: null,
@@ -595,7 +605,9 @@ function renderBomb() {
   const me = bomb.players[state.user.uid];
   const waiting = bomb.status === "waiting";
   const finished = bomb.status === "finished";
-  const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid;
+  const choosingLetter = popCards && bomb.phase === "letter_select";
+  const answeringPopCard = popCards && bomb.phase === "answer";
+  const canAnswer = bomb.status === "playing" && bomb.turn === state.user.uid && (!popCards || answeringPopCard);
   $("#bomb-screen").classList.toggle("waiting", waiting);
   $("#bomb-screen").classList.toggle("finished", finished);
   if (!finished) {
@@ -627,6 +639,8 @@ function renderBomb() {
     `).join("")}</div>
   ` : "";
   renderBombAnswerLog();
+  renderPopCardDisplay(bomb);
+  renderPopLetterWheel(bomb, choosingLetter);
   const turnStage = $(".bomb-turn-stage");
   const compactArena = turnStage.clientWidth < 600;
   $("#bomb-players").innerHTML = players.map((player, index) => {
@@ -644,17 +658,20 @@ function renderBomb() {
   $("#bomb-turn-arrow").classList.toggle("hidden", bomb.status !== "playing");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
   const requiredChain = bomb.requiredSyllable || bomb.requiredStart;
-  const cardChallenge = bomb.challenge || {};
-  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : popCards ? String(cardChallenge.letter || "?").toUpperCase() : chain ? (requiredChain ? requiredChain.toUpperCase() : "ANY") : bomb.prompt;
+  const activeCard = bomb.activeCard || {};
+  const selectedLetter = bomb.selectedLetter || "";
+  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : popCards ? (selectedLetter ? selectedLetter.toUpperCase() : "A-Z") : chain ? (requiredChain ? requiredChain.toUpperCase() : "ANY") : bomb.prompt;
   $("#bomb-live-label").textContent = waiting
-    ? (popCards ? "Todos marcam pronto. O host sorteia cartas de cultura pop e tecnologia." : chain ? "Todos marcam pronto. A primeira palavra sera livre." : "Todos marcam pronto. O host inicia a partida.")
+    ? (popCards ? "Todos marcam pronto. O host sorteia a carta da partida." : chain ? "Todos marcam pronto. A primeira palavra sera livre." : "Todos marcam pronto. O host inicia a partida.")
     : popCards
-      ? `Carta: ${cardChallenge.title || "Tema surpresa"} · ${activePlayer?.name || "PLAYER"} responde com ${String(cardChallenge.letter || "?").toUpperCase()}:`
+      ? choosingLetter
+        ? `${activePlayer?.name || "PLAYER"} escolhe uma letra disponivel para ${activeCard.title || "a carta"}:`
+        : `${activePlayer?.name || "PLAYER"} responde ${activeCard.title || "a carta"} com ${selectedLetter.toUpperCase()}:`
       : chain
       ? `${activePlayer?.name || "PLAYER"} precisa usar ${requiredChain ? requiredChain.toUpperCase() : "qualquer silaba"}${bomb.lastWord ? ` depois de ${bomb.lastWord}` : ""}:`
       : `${activePlayer?.name || "PLAYER"} digita uma palavra ao vivo:`;
   $("#bomb-input").disabled = !canAnswer;
-  $("#bomb-input").placeholder = canAnswer ? (popCards ? "ex: adele, avatar, apple..." : chain ? "digite_uma_palavra_da_corrente..." : "digite_a_palavra_completa...") : "aguarde_seu_turno...";
+  $("#bomb-input").placeholder = canAnswer ? (popCards ? `responda_com_${selectedLetter.toUpperCase()}...` : chain ? "digite_uma_palavra_da_corrente..." : "digite_a_palavra_completa...") : choosingLetter && bomb.turn === state.user.uid ? "escolha_uma_letra_acima..." : "aguarde_seu_turno...";
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
   $("#bomb-live-typing").textContent = bomb.status === "playing" && liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
@@ -663,6 +680,7 @@ function renderBomb() {
   const allReady = players.length >= 2 && players.every((player) => player.ready);
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
   $("#bomb-start").disabled = !allReady;
+  $("#bomb-start").textContent = popCards ? "SORTEAR CARTA" : "INICIAR PARTIDA";
   $("#bomb-rematch").classList.toggle("hidden", bomb.status !== "finished");
   if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host ja pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
   if (bomb.lastFeedback) renderBombFeedback(bomb.lastFeedback);
@@ -691,6 +709,10 @@ function renderBombFeedback(feedback) {
       : `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
     element.className = "feedback correct";
     if (isNewFeedback) playSound("correct");
+  } else if (feedback.kind === "letter_selected") {
+    element.textContent = `${actor} escolheu a letra ${String(feedback.letter || feedback.answer || "").toUpperCase()}. Agora tem 10s para responder.`;
+    element.className = "feedback";
+    if (isNewFeedback) playSound("click");
   } else if (feedback.kind === "timeout") {
     element.textContent = `${actor} perdeu um coração: tempo esgotado.`;
     element.className = "feedback timeout";
@@ -703,6 +725,10 @@ function renderBombFeedback(feedback) {
     element.textContent = popCards
       ? `${actor} escreveu ${feedback.answer}, mas a resposta precisava comecar com ${(feedback.required || "").toUpperCase()}.`
       : `${actor} escreveu ${feedback.answer}, mas precisava conter ${(feedback.required || "").toUpperCase()}.`;
+    element.className = "feedback wrong";
+    if (isNewFeedback) playSound("wrong");
+  } else if (feedback.kind === "invalid_letter") {
+    element.textContent = `${actor} tentou uma letra indisponivel para esta carta.`;
     element.className = "feedback wrong";
     if (isNewFeedback) playSound("wrong");
   } else {
@@ -737,11 +763,77 @@ function renderBombAnswerLog() {
   }).join("") : `<p class="bomb-log-empty">Nenhuma palavra enviada ainda.</p>`;
 }
 
+function renderPopCardDisplay(bomb) {
+  const panel = $("#pop-card-display");
+  if (!isPopCards(bomb) || bomb.status === "waiting" || !bomb.activeCard) {
+    panel.classList.add("hidden");
+    state.lastPopCardId = null;
+    clearTimeout(state.popCardRollTimer);
+    state.popCardRollTimer = null;
+    return;
+  }
+  panel.classList.remove("hidden");
+  if (state.lastPopCardId !== bomb.activeCard.id) {
+    state.lastPopCardId = bomb.activeCard.id;
+    startPopCardRoulette(bomb.activeCard);
+    return;
+  }
+  renderPopCardFace(bomb.activeCard);
+}
+
+function renderPopCardFace(card) {
+  $("#pop-card-icon").textContent = card.icon || "▣";
+  $("#pop-card-title").textContent = card.title || "Carta surpresa";
+  $("#pop-card-category").textContent = card.category || "POP/TECH";
+}
+
+function startPopCardRoulette(finalCard) {
+  const panel = $("#pop-card-display");
+  clearTimeout(state.popCardRollTimer);
+  panel.classList.add("rolling");
+  let step = 0;
+  const spin = () => {
+    if (step < 10) {
+      renderPopCardFace(POP_CARD_ROULETTE[step % POP_CARD_ROULETTE.length]);
+      step += 1;
+      state.popCardRollTimer = setTimeout(spin, 70 + step * 12);
+      return;
+    }
+    renderPopCardFace(finalCard);
+    panel.classList.remove("rolling");
+    state.popCardRollTimer = null;
+  };
+  spin();
+}
+
+function renderPopLetterWheel(bomb, choosingLetter) {
+  const wheel = $("#pop-letter-wheel");
+  if (!isPopCards(bomb) || bomb.status !== "playing") {
+    wheel.classList.add("hidden");
+    wheel.innerHTML = "";
+    return;
+  }
+  const used = bomb.usedLetters || {};
+  const available = new Set(bomb.availableLetters || []);
+  const canChoose = choosingLetter && bomb.turn === state.user.uid;
+  const selected = bomb.selectedLetter || "";
+  wheel.classList.remove("hidden");
+  wheel.innerHTML = "abcdefghijklmnopqrstuvwxyz".split("").map((letter) => {
+    const isUsed = Boolean(used[letter]);
+    const isAvailable = available.has(letter);
+    const disabled = !canChoose || isUsed || !isAvailable;
+    return `<button class="pop-letter-button ${isUsed ? "used" : ""} ${selected === letter ? "active" : ""}" type="button" data-pop-letter="${letter}" ${disabled ? "disabled" : ""}>${letter.toUpperCase()}</button>`;
+  }).join("");
+  wheel.querySelectorAll("[data-pop-letter]").forEach((button) => button.addEventListener("click", () => choosePopLetter(button.dataset.popLetter)));
+}
+
 function bombLogLabel(entry) {
   if (entry.kind === "correct") return "OK";
   if (entry.kind === "duplicate") return "REP";
   if (entry.kind === "missing_syllable") return "REQ";
   if (entry.kind === "wrong_start") return "LET";
+  if (entry.kind === "letter_selected") return "AZ";
+  if (entry.kind === "invalid_letter") return "NO";
   return "ERR";
 }
 
@@ -857,6 +949,24 @@ async function submitBombAnswer(event) {
     $("#bomb-feedback").textContent = error.message;
     $("#bomb-feedback").className = "feedback wrong";
     focusInput("#bomb-input");
+  }
+}
+
+async function choosePopLetter(letter) {
+  if (!state.bomb || !isPopCards(state.bomb) || state.bomb.phase !== "letter_select" || state.bomb.turn !== state.user.uid) return;
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}/answer`, { method: "POST", body: { answer: letter, round: state.bomb.round } })).bomb;
+    syncRoomClock(state.bomb);
+    renderBomb();
+    await publishBombSignal("letter");
+  } catch (error) {
+    if (error.payload?.bomb) {
+      state.bomb = error.payload.bomb;
+      syncRoomClock(state.bomb);
+      renderBomb();
+    }
+    $("#bomb-feedback").textContent = error.message;
+    $("#bomb-feedback").className = "feedback wrong";
   }
 }
 
@@ -1548,6 +1658,11 @@ function playSound(kind) {
     note(523.25, 0, .12);
     note(659.25, .08, .14);
     note(783.99, .16, .18);
+    return;
+  }
+  if (kind === "click") {
+    note(392, 0, .06, "square", .045);
+    note(523.25, .04, .07, "square", .04);
     return;
   }
   if (kind === "victory") {

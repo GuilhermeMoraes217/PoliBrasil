@@ -54,6 +54,7 @@ POP_CARD_DECK = (
         "id": "famous_singer",
         "title": "Cantora famosa",
         "category": "cultura_pop",
+        "icon": "♪",
         "answers": (
             "Adele", "Anitta", "Ariana Grande", "Beyonce", "Billie Eilish", "Britney Spears",
             "Dua Lipa", "Demi Lovato", "Gloria Groove", "Iza", "Janet Jackson", "Katy Perry",
@@ -66,6 +67,7 @@ POP_CARD_DECK = (
         "id": "famous_movie",
         "title": "Filme famoso",
         "category": "entretenimento",
+        "icon": "▶",
         "answers": (
             "Avatar", "Avengers", "Barbie", "Batman", "Black Panther", "Coraline",
             "Dune", "Encanto", "Frozen", "Gladiator", "Harry Potter", "Inception",
@@ -77,6 +79,7 @@ POP_CARD_DECK = (
         "id": "famous_series",
         "title": "Serie famosa",
         "category": "entretenimento",
+        "icon": "TV",
         "answers": (
             "Arcane", "Breaking Bad", "Dark", "Dexter", "Euphoria", "Friends",
             "Game of Thrones", "House", "Loki", "Lost", "Narcos", "One Piece",
@@ -89,6 +92,7 @@ POP_CARD_DECK = (
         "id": "tech_company",
         "title": "Empresa de tecnologia",
         "category": "tecnologia",
+        "icon": "⌘",
         "answers": (
             "Adobe", "Amazon", "Apple", "Asus", "Dell", "Discord", "Dropbox", "Google",
             "HP", "IBM", "Intel", "Lenovo", "Meta", "Microsoft", "Mozilla", "Netflix",
@@ -100,6 +104,7 @@ POP_CARD_DECK = (
         "id": "programming_language",
         "title": "Linguagem de programacao",
         "category": "tecnologia",
+        "icon": "</>",
         "answers": (
             "Assembly", "Bash", "Clojure", "Cobol", "Dart", "Elixir", "Erlang", "Fortran",
             "Go", "Groovy", "Haskell", "Java", "JavaScript", "Kotlin", "Lua", "Matlab",
@@ -111,6 +116,7 @@ POP_CARD_DECK = (
         "id": "game_franchise",
         "title": "Game famoso",
         "category": "entretenimento",
+        "icon": "✦",
         "answers": (
             "Among Us", "Apex Legends", "Baldurs Gate", "Call of Duty", "Celeste",
             "Cyberpunk", "Doom", "Elden Ring", "FIFA", "Fortnite", "Free Fire",
@@ -679,6 +685,8 @@ def chain_final_syllable(word: str) -> str:
 def public_bomb(bomb: dict) -> dict:
     public = json.loads(json.dumps(bomb))
     public["serverNow"] = now_ms()
+    if public.get("mode") == "pop_cards":
+        public["availableLetters"] = available_pop_letters(public)
     public.pop("usedWords", None)
     public.pop("usedPrompts", None)
     return public
@@ -687,7 +695,7 @@ def public_bomb(bomb: dict) -> dict:
 def set_bomb_feedback(bomb: dict, uid: str, kind: str, answer: str, **extra) -> dict:
     feedback = {"id": now_ms(), "uid": uid, "kind": kind, "answer": answer, **extra}
     bomb["lastFeedback"] = feedback
-    if kind in {"correct", "invalid", "duplicate", "missing_syllable"}:
+    if kind in {"correct", "invalid", "duplicate", "missing_syllable", "wrong_start", "invalid_letter", "letter_selected"}:
         entry = {
             "id": feedback["id"],
             "uid": uid,
@@ -751,21 +759,22 @@ def next_alive_after(bomb: dict, current: str | None, alive: list[str]) -> str:
     return alive[0]
 
 
-def choose_pop_card_challenge(used_prompts: list[str]) -> dict:
-    candidates = []
-    for card in POP_CARD_INDEX.values():
-        for letter in card["letters"]:
-            challenge_id = f"{card['id']}:{letter}"
-            if challenge_id not in used_prompts:
-                candidates.append((card, letter, challenge_id))
+def choose_pop_card(used_prompts: list[str]) -> dict:
+    candidates = [card for card in POP_CARD_INDEX.values() if card["id"] not in used_prompts]
     if not candidates:
         used_prompts.clear()
-        for card in POP_CARD_INDEX.values():
-            for letter in card["letters"]:
-                candidates.append((card, letter, f"{card['id']}:{letter}"))
-    card, letter, challenge_id = random.choice(candidates)
-    used_prompts.append(challenge_id)
-    return {"id": challenge_id, "cardId": card["id"], "title": card["title"], "category": card["category"], "letter": letter}
+        candidates = list(POP_CARD_INDEX.values())
+    card = random.choice(candidates)
+    used_prompts.append(card["id"])
+    return {"id": card["id"], "title": card["title"], "category": card["category"], "icon": card.get("icon", "▣")}
+
+
+def available_pop_letters(bomb: dict) -> list[str]:
+    card = POP_CARD_INDEX.get((bomb.get("activeCard") or {}).get("id", ""))
+    if not card:
+        return []
+    used_letters = set(bomb.setdefault("usedLetters", {}))
+    return [letter for letter in card["letters"] if letter not in used_letters]
 
 
 def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> dict:
@@ -783,7 +792,12 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
         bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
         return bomb
     if bomb.get("mode") == "pop_cards":
-        bomb["challenge"] = choose_pop_card_challenge(bomb.setdefault("usedPrompts", []))
+        if not bomb.get("activeCard"):
+            bomb["activeCard"] = choose_pop_card(bomb.setdefault("usedPrompts", []))
+        if not available_pop_letters(bomb):
+            bomb["usedLetters"] = {}
+        bomb["phase"] = "letter_select"
+        bomb["selectedLetter"] = None
         bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
         return bomb
     prompts = BOMB_SUBLEVEL_PROMPTS[bomb["language"]][bomb["difficulty"]][bomb["sublevel"]]
@@ -823,9 +837,21 @@ def apply_chain_answer(database: sqlite3.Connection, bomb: dict, uid: str, answe
 
 def apply_pop_card_answer(database: sqlite3.Connection, bomb: dict, uid: str, answer: str) -> tuple[dict, bool]:
     normalized = normalize(answer)
-    challenge = bomb.get("challenge") or {}
-    card = POP_CARD_INDEX.get(challenge.get("cardId", ""))
-    letter = challenge.get("letter", "")
+    active_card = bomb.get("activeCard") or {}
+    card = POP_CARD_INDEX.get(active_card.get("id", ""))
+    phase = bomb.get("phase", "letter_select")
+    letter = bomb.get("selectedLetter") or ""
+    if phase == "letter_select":
+        chosen = normalized[:1]
+        available = available_pop_letters(bomb)
+        if len(normalized) != 1 or chosen not in available:
+            set_bomb_feedback(bomb, uid, "invalid_letter", normalized, card=active_card.get("title", "Carta"))
+            return bomb, False
+        bomb["selectedLetter"] = chosen
+        bomb["phase"] = "answer"
+        bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+        set_bomb_feedback(bomb, uid, "letter_selected", chosen, card=active_card.get("title", "Carta"), letter=chosen)
+        return bomb, True
     if normalized in bomb.setdefault("usedWords", {}):
         set_bomb_feedback(bomb, uid, "duplicate", normalized)
         return bomb, False
@@ -833,14 +859,15 @@ def apply_pop_card_answer(database: sqlite3.Connection, bomb: dict, uid: str, an
         set_bomb_feedback(bomb, uid, "invalid", normalized)
         return bomb, False
     if not normalized.startswith(letter):
-        set_bomb_feedback(bomb, uid, "wrong_start", normalized, required=letter, card=challenge.get("title", "Carta"))
+        set_bomb_feedback(bomb, uid, "wrong_start", normalized, required=letter, card=active_card.get("title", "Carta"))
         return bomb, False
     if normalized not in card["answers"]:
-        set_bomb_feedback(bomb, uid, "invalid", normalized, card=challenge["title"], letter=letter)
+        set_bomb_feedback(bomb, uid, "invalid", normalized, card=active_card["title"], letter=letter)
         return bomb, False
     bomb["usedWords"][normalized] = True
+    bomb.setdefault("usedLetters", {})[letter] = True
     bomb["players"][uid]["score"] = bomb["players"][uid].get("score", 0) + 120
-    set_bomb_feedback(bomb, uid, "correct", normalized, xp=120, card=challenge["title"], letter=letter)
+    set_bomb_feedback(bomb, uid, "correct", normalized, xp=120, card=active_card["title"], letter=letter)
     return next_bomb_turn(bomb, database), True
 
 
@@ -876,8 +903,9 @@ def advance_bomb(database: sqlite3.Connection, bomb: dict) -> dict:
     player["hearts"] = max(0, player.get("hearts", 0) - 1)
     timeout_answer = bomb.get("requiredSyllable") or bomb.get("requiredStart") or bomb.get("prompt", "")
     if bomb.get("mode") == "pop_cards":
-        challenge = bomb.get("challenge") or {}
-        timeout_answer = f"{challenge.get('title', 'Carta')}:{str(challenge.get('letter', '')).upper()}"
+        active_card = bomb.get("activeCard") or {}
+        selected = str(bomb.get("selectedLetter") or "").upper()
+        timeout_answer = f"{active_card.get('title', 'Carta')}:{selected or 'LETRA'}"
     bomb["lastFeedback"] = {"id": now_ms(), "uid": player["uid"], "kind": "timeout", "answer": timeout_answer}
     return next_bomb_turn(bomb, database)
 
@@ -1014,7 +1042,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             if mode == "word_chain":
                 bomb.update({"lastWord": None, "requiredSyllable": None})
             if mode == "pop_cards":
-                bomb.update({"challenge": None})
+                bomb.update({"activeCard": None, "selectedLetter": None, "phase": "waiting_card", "usedLetters": {}})
             write_bomb(database, bomb)
         return self.send_json({"bomb": public_bomb(bomb)}, status=201)
 
@@ -1094,6 +1122,8 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 error = f"A palavra precisa conter a silaba {feedback.get('required', '').upper()}."
             elif feedback.get("kind") == "wrong_start":
                 error = f"A resposta precisa comecar com {feedback.get('required', '').upper()}."
+            elif feedback.get("kind") == "invalid_letter":
+                error = "Escolha uma letra disponivel para esta carta."
             else:
                 error = "Palavra invalida. Tente novamente antes do tempo acabar."
         return self.send_json({"bomb": public_bomb(bomb), "error": error}, status=status)
@@ -1138,7 +1168,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             if bomb.get("mode") == "word_chain":
                 bomb.update({"lastWord": None, "requiredSyllable": None})
             if bomb.get("mode") == "pop_cards":
-                bomb.update({"challenge": None})
+                bomb.update({"activeCard": None, "selectedLetter": None, "phase": "waiting_card", "usedLetters": {}})
             bomb.pop("rankingRecorded", None)
             for player in bomb["players"].values():
                 player.update({"hearts": 3, "score": 0, "ready": False})

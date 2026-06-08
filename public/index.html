@@ -212,9 +212,18 @@
         <div class="bomb-layout">
           <section class="arena-card bomb-arena">
             <p id="bomb-phase" class="eyebrow">// WAITING_FOR_PLAYERS</p>
+            <div id="pop-card-display" class="pop-card-display hidden">
+              <span id="pop-card-icon">▣</span>
+              <div>
+                <small>// CARTA_DA_PARTIDA</small>
+                <b id="pop-card-title">Carta surpresa</b>
+                <em id="pop-card-category">POP/TECH</em>
+              </div>
+            </div>
             <h2 id="bomb-prompt"><span id="bomb-prefix">READY?</span></h2>
             <p id="bomb-live-label" class="prompt-hint">Digite uma palavra que contenha a sílaba exibida.</p>
             <div id="bomb-live-typing" class="bomb-live-word"></div>
+            <div id="pop-letter-wheel" class="pop-letter-wheel hidden"></div>
             <div id="bomb-finish-panel" class="bomb-finish-panel hidden">
               <p class="eyebrow">// MATCH_COMPLETE</p>
               <h3 id="bomb-finish-title">PLAYER venceu!</h3>
