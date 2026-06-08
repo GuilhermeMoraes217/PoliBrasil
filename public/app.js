@@ -112,6 +112,7 @@ function bindInterface() {
   $("#create-bomb").addEventListener("click", createBomb);
   $("#join-bomb").addEventListener("click", joinBomb);
   $("#bomb-ready").addEventListener("click", toggleBombReady);
+  $("#bomb-redraw-card").addEventListener("click", redrawPopCard);
   $("#bomb-start").addEventListener("click", startBombMatch);
   $("#bomb-rematch").addEventListener("click", requestBombRematch);
   $("#leave-bomb").addEventListener("click", leaveBomb);
@@ -499,10 +500,10 @@ function configureBombModal(mode) {
   $("#bomb-language").classList.toggle("hidden", popCards);
   $("#bomb-language").value = popCards ? "pt" : $("#bomb-language").value;
   $("#bomb-modal-note").textContent = popCards
-    ? "Sorteie cartas de cultura pop, entretenimento e tecnologia. Responda um item valido com a letra exibida."
+    ? "Sorteie cartas de cultura pop, entretenimento e tecnologia. O tempo vale para escolher letra e responder."
     : chain
     ? "A primeira palavra e livre. Depois, cada resposta precisa conter a ultima silaba da palavra anterior."
-    : "A partida comeca em EASY 1 e aumenta o nivel automaticamente a cada 5-7 rodadas.";
+    : "Escolha o tempo de cada turno. A partida aumenta o nivel automaticamente a cada 5-7 rodadas.";
 }
 
 async function loadOpenBombs() {
@@ -526,7 +527,14 @@ async function loadOpenBombs() {
 
 async function createBomb() {
   try {
-    const { bomb } = await api("/bombs", { method: "POST", body: { language: $("#bomb-language").value, mode: state.selectedBombMode } });
+    const { bomb } = await api("/bombs", {
+      method: "POST",
+      body: {
+        language: $("#bomb-language").value,
+        mode: state.selectedBombMode,
+        roundSeconds: Number($("#bomb-round-seconds").value),
+      },
+    });
     $("#bomb-modal").close();
     enterBomb(bomb);
   } catch (error) {
@@ -615,7 +623,7 @@ function renderBomb() {
     state.lastBombFinish = null;
   }
   $("#bomb-screen-title").textContent = `${bombGameLabel(bomb)} · MULTIPLAYER`;
-  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${popCards ? "POP/TECH" : bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
+  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${popCards ? "POP/TECH" : bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bomb.roundSeconds || 10}S · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
   $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar ${bombGameTitle(bomb)} no Poli English Duel? ${bombInviteUrl()}`)}`;
   const playerCard = (player, index) => `
@@ -678,9 +686,12 @@ function renderBomb() {
   $("#bomb-invite").classList.toggle("hidden", !waiting);
   $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
   const allReady = players.length >= 2 && players.every((player) => player.ready);
+  const canRedrawCard = waiting && popCards && bomb.owner === state.user.uid && !bomb.round;
+  $("#bomb-redraw-card").classList.toggle("hidden", !canRedrawCard);
+  $("#bomb-redraw-card").disabled = !canRedrawCard;
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
   $("#bomb-start").disabled = !allReady;
-  $("#bomb-start").textContent = popCards ? "SORTEAR CARTA" : "INICIAR PARTIDA";
+  $("#bomb-start").textContent = popCards ? (bomb.activeCard ? "INICIAR PARTIDA" : "SORTEAR E INICIAR") : "INICIAR PARTIDA";
   $("#bomb-rematch").classList.toggle("hidden", bomb.status !== "finished");
   if (waiting) $("#bomb-feedback").textContent = allReady ? "Todos prontos. O host ja pode iniciar." : "Marque pronto e aguarde os demais jogadores.";
   if (bomb.lastFeedback) renderBombFeedback(bomb.lastFeedback);
@@ -710,7 +721,11 @@ function renderBombFeedback(feedback) {
     element.className = "feedback correct";
     if (isNewFeedback) playSound("correct");
   } else if (feedback.kind === "letter_selected") {
-    element.textContent = `${actor} escolheu a letra ${String(feedback.letter || feedback.answer || "").toUpperCase()}. Agora tem 10s para responder.`;
+    element.textContent = `${actor} escolheu a letra ${String(feedback.letter || feedback.answer || "").toUpperCase()}. Agora tem ${state.bomb.roundSeconds || 10}s para responder.`;
+    element.className = "feedback";
+    if (isNewFeedback) playSound("click");
+  } else if (feedback.kind === "card_drawn") {
+    element.textContent = `Carta sorteada: ${feedback.card || feedback.answer}. O host ainda pode trocar antes de iniciar.`;
     element.className = "feedback";
     if (isNewFeedback) playSound("click");
   } else if (feedback.kind === "timeout") {
@@ -896,14 +911,26 @@ function startBombTimer() {
   clearInterval(state.bombTimer);
   const tick = () => {
     if (!state.bomb || state.bomb.status !== "playing") return;
-    const remaining = Math.min(ROUND_MS, Math.max(0, Number(state.bomb.deadline) - (Date.now() + state.serverOffset)));
-    $("#bomb-timer-bar").style.width = `${(remaining / ROUND_MS) * 100}%`;
+    const roundMs = Number(state.bomb.roundSeconds || 10) * 1000;
+    const remaining = Math.min(roundMs, Math.max(0, Number(state.bomb.deadline) - (Date.now() + state.serverOffset)));
+    $("#bomb-timer-bar").style.width = `${(remaining / roundMs) * 100}%`;
     $("#bomb-timer-number").textContent = Math.ceil(remaining / 1000);
     $("#bomb-screen").classList.toggle("danger", remaining > 0 && remaining <= 3000);
     if (remaining <= 0) refreshBomb({ broadcast: true, reason: "timeout" });
   };
   tick();
   state.bombTimer = setInterval(tick, 160);
+}
+
+async function redrawPopCard() {
+  if (!state.bomb || !isPopCards(state.bomb)) return;
+  try {
+    state.bomb = (await api(`/bombs/${state.bomb.code}/redraw`, { method: "POST", body: {} })).bomb;
+    renderBomb();
+    await publishBombSignal("redraw");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function toggleBombReady() {

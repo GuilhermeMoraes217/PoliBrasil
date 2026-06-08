@@ -250,6 +250,7 @@
             </div>
             <div class="bomb-lobby-actions">
               <button id="bomb-ready" class="button secondary">ESTOU PRONTO</button>
+              <button id="bomb-redraw-card" class="button secondary hidden">NOVA CARTA</button>
               <button id="bomb-start" class="button primary">INICIAR PARTIDA</button>
               <button id="bomb-rematch" class="button primary hidden">JOGAR NOVAMENTE</button>
             </div>
@@ -342,6 +343,14 @@
       <select id="bomb-language" class="category-choice">
         <option value="en">INGLÊS</option>
         <option value="pt">PORTUGUÊS</option>
+      </select>
+      <label id="bomb-time-label">TEMPO POR ACAO</label>
+      <select id="bomb-round-seconds" class="category-choice">
+        <option value="8">8 SEGUNDOS</option>
+        <option value="10" selected>10 SEGUNDOS</option>
+        <option value="12">12 SEGUNDOS</option>
+        <option value="15">15 SEGUNDOS</option>
+        <option value="20">20 SEGUNDOS</option>
       </select>
       <p id="bomb-modal-note" class="muted">A partida começa em EASY 1 e aumenta o nível automaticamente a cada 5–7 rodadas.</p>
       <button id="create-bomb" class="button primary wide">CRIAR NOVA SALA</button>

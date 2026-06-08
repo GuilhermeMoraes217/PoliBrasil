@@ -25,6 +25,7 @@ FREEDICT_DATA = ROOT / "data" / "freedict-index.json"
 DATABASE = ROOT / "data" / "poli.db"
 FIREBASE_DATABASE_URL = "https://poligbrasil-2022-default-rtdb.firebaseio.com"
 ROUND_SECONDS = 10
+BOMB_ALLOWED_ROUND_SECONDS = {8, 10, 12, 15, 20}
 BOMB_MAX_PLAYERS = 8
 BOMB_DIFFICULTIES = {"easy", "medium", "hard"}
 BOMB_LEVELS = tuple(
@@ -195,6 +196,18 @@ def now_ms() -> int:
 def normalize(value: str) -> str:
     text = unicodedata.normalize("NFD", value.lower())
     return re.sub(r"[^a-z]", "", "".join(char for char in text if unicodedata.category(char) != "Mn"))
+
+
+def bomb_round_seconds(bomb: dict) -> int:
+    try:
+        seconds = int(bomb.get("roundSeconds", ROUND_SECONDS))
+    except (TypeError, ValueError):
+        seconds = ROUND_SECONDS
+    return seconds if seconds in BOMB_ALLOWED_ROUND_SECONDS else ROUND_SECONDS
+
+
+def bomb_deadline(bomb: dict) -> int:
+    return now_ms() + bomb_round_seconds(bomb) * 1000
 
 
 def build_pop_card_index() -> dict[str, dict]:
@@ -1024,6 +1037,21 @@ def choose_pop_card(used_prompts: list[str]) -> dict:
     return {"id": card["id"], "title": card["title"], "category": card["category"], "icon": card.get("icon", "▣")}
 
 
+def redraw_pop_card(bomb: dict) -> dict:
+    bomb["activeCard"] = choose_pop_card(bomb.setdefault("usedPrompts", []))
+    bomb["phase"] = "waiting_card"
+    bomb["selectedLetter"] = None
+    bomb["usedLetters"] = {}
+    bomb["lastFeedback"] = {
+        "id": now_ms(),
+        "uid": bomb.get("owner", ""),
+        "kind": "card_drawn",
+        "answer": bomb["activeCard"]["title"],
+        "card": bomb["activeCard"]["title"],
+    }
+    return bomb
+
+
 def available_pop_letters(bomb: dict) -> list[str]:
     card = POP_CARD_INDEX.get((bomb.get("activeCard") or {}).get("id", ""))
     if not card:
@@ -1044,7 +1072,7 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
     current = bomb.get("turn")
     bomb["turn"] = next_alive_after(bomb, current, alive)
     if bomb.get("mode") == "word_chain":
-        bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+        bomb["deadline"] = bomb_deadline(bomb)
         return bomb
     if bomb.get("mode") == "pop_cards":
         if not bomb.get("activeCard"):
@@ -1053,7 +1081,7 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
             bomb["usedLetters"] = {}
         bomb["phase"] = "letter_select"
         bomb["selectedLetter"] = None
-        bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+        bomb["deadline"] = bomb_deadline(bomb)
         return bomb
     prompts = BOMB_SUBLEVEL_PROMPTS[bomb["language"]][bomb["difficulty"]][bomb["sublevel"]]
     if not prompts:
@@ -1064,7 +1092,7 @@ def next_bomb_turn(bomb: dict, database: sqlite3.Connection | None = None) -> di
         available = prompts
     bomb["prompt"] = random.choice(available)
     bomb["usedPrompts"].append(bomb["prompt"])
-    bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+    bomb["deadline"] = bomb_deadline(bomb)
     return bomb
 
 
@@ -1104,7 +1132,7 @@ def apply_pop_card_answer(database: sqlite3.Connection, bomb: dict, uid: str, an
             return bomb, False
         bomb["selectedLetter"] = chosen
         bomb["phase"] = "answer"
-        bomb["deadline"] = now_ms() + ROUND_SECONDS * 1000
+        bomb["deadline"] = bomb_deadline(bomb)
         set_bomb_feedback(bomb, uid, "letter_selected", chosen, card=active_card.get("title", "Carta"), letter=chosen)
         return bomb, True
     if normalized in bomb.setdefault("usedWords", {}):
@@ -1262,7 +1290,7 @@ class PoliHandler(SimpleHTTPRequestHandler):
             return self.create_context(user, payload)
         if path == "/api/bombs":
             return self.create_bomb(user, payload)
-        bomb_match = re.fullmatch(r"/api/bombs/([A-Z0-9]{6})/(join|ready|start|answer|leave|rematch)", path)
+        bomb_match = re.fullmatch(r"/api/bombs/([A-Z0-9]{6})/(join|ready|start|answer|leave|rematch|redraw)", path)
         if bomb_match:
             code, action = bomb_match.groups()
             return getattr(self, f"{action}_bomb")(code, user, payload)
@@ -1279,10 +1307,16 @@ class PoliHandler(SimpleHTTPRequestHandler):
     def create_bomb(self, user: dict, payload: dict):
         language = payload.get("language", "en")
         mode = payload.get("mode", "word_bomb")
+        try:
+            round_seconds = int(payload.get("roundSeconds", ROUND_SECONDS))
+        except (TypeError, ValueError):
+            round_seconds = ROUND_SECONDS
         if language not in {"en", "pt"}:
             return self.send_json({"error": "Idioma invalido"}, status=400)
         if mode not in {"word_bomb", "word_chain", "pop_cards"}:
             return self.send_json({"error": "Modo invalido"}, status=400)
+        if round_seconds not in BOMB_ALLOWED_ROUND_SECONDS:
+            return self.send_json({"error": "Tempo invalido"}, status=400)
         with LOCK, closing(connect_db()) as database, database:
             code = random_code()
             while read_bomb(database, code):
@@ -1290,7 +1324,8 @@ class PoliHandler(SimpleHTTPRequestHandler):
             player = self.player_from_user(user)
             player["ready"] = False
             bomb = {
-                "code": code, "owner": user["uid"], "mode": mode, "language": language, "difficulty": "easy", "sublevel": 1, "status": "waiting",
+                "code": code, "owner": user["uid"], "mode": mode, "language": language, "roundSeconds": round_seconds,
+                "difficulty": "easy", "sublevel": 1, "status": "waiting",
                 "createdAt": now_ms(), "round": 0, "players": {user["uid"]: player}, "order": [user["uid"]],
                 "usedWords": {}, "usedPrompts": [], "answerLog": [], "progression": {"stage": 0, "nextLevelAt": random.randint(5, 7)},
             }
@@ -1353,6 +1388,22 @@ class PoliHandler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "Todos os jogadores precisam estar prontos"}, status=409)
             bomb["status"] = "playing"
             bomb = next_bomb_turn(bomb, database)
+            write_bomb(database, bomb)
+        return self.send_json({"bomb": public_bomb(bomb)})
+
+    def redraw_bomb(self, code: str, user: dict, payload: dict):
+        del payload
+        with LOCK, closing(connect_db()) as database, database:
+            bomb = read_bomb(database, code)
+            if not bomb or user["uid"] not in bomb.get("players", {}):
+                return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
+            if bomb["owner"] != user["uid"]:
+                return self.send_json({"error": "Somente o host pode sortear outra carta"}, status=403)
+            if bomb.get("mode") != "pop_cards":
+                return self.send_json({"error": "Esta acao existe apenas no Pop Cards"}, status=400)
+            if bomb["status"] != "waiting" or bomb.get("round", 0) > 0:
+                return self.send_json({"error": "A carta so pode ser trocada antes da partida comecar"}, status=409)
+            bomb = redraw_pop_card(bomb)
             write_bomb(database, bomb)
         return self.send_json({"bomb": public_bomb(bomb)})
 

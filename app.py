@@ -132,7 +132,7 @@ def create_bomb():
 
 @app.post("/api/bombs/<code>/<action>")
 def bomb_action(code, action):
-    if not re.fullmatch(r"(join|ready|start|answer|leave|rematch)", action):
+    if not re.fullmatch(r"(join|ready|start|answer|leave|rematch|redraw)", action):
         return jsonify({"error": "Endpoint not found"}), 404
     handler = FlaskPoliHandler()
     user = handler.require_user()

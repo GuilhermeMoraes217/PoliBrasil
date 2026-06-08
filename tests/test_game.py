@@ -388,6 +388,19 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["turn"], "two")
         self.assertEqual(bomb["phase"], "letter_select")
 
+    def test_word_bomb_uses_configured_round_seconds(self):
+        bomb = {
+            "code": "BOMB15", "mode": "word_bomb", "status": "playing", "language": "en", "roundSeconds": 15,
+            "difficulty": "easy", "sublevel": 1, "round": 0, "turn": "one",
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": [],
+        }
+        before = server.now_ms()
+        bomb = server.next_bomb_turn(bomb)
+        remaining = bomb["deadline"] - before
+        self.assertGreaterEqual(remaining, 14_500)
+        self.assertLessEqual(remaining, 15_500)
+
     def test_word_chain_first_answer_sets_next_required_syllable(self):
         bomb = {
             "code": "CHAIN1", "mode": "word_chain", "status": "playing", "language": "en",
