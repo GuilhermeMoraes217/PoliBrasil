@@ -163,6 +163,8 @@ REMOTE_BOMB_VOCABULARY = os.getenv("POLI_REMOTE_BOMB_VOCABULARY", "1").lower() n
 REMOTE_BOMB_CACHE: dict[tuple[str, str], set[str]] = {}
 FREE_WORD_FALLBACK = os.getenv("POLI_FREE_WORD_FALLBACK", "1").lower() not in {"0", "false", "no"}
 FREE_WORD_CACHE: dict[tuple[str, str], bool] = {}
+POP_CARD_REMOTE_FALLBACK = os.getenv("POLI_POP_CARD_REMOTE_FALLBACK", "1").lower() not in {"0", "false", "no"}
+POP_CARD_REMOTE_CACHE: dict[tuple[str, str], bool] = {}
 FIREBASE_DATABASE_AUTH = os.getenv("POLI_FIREBASE_DATABASE_AUTH", "").strip()
 
 
@@ -264,6 +266,14 @@ def initialize_db() -> None:
                 code TEXT PRIMARY KEY,
                 payload TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS pop_card_answers (
+                card_id TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                label TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (card_id, answer)
             );
             """
         )
@@ -632,6 +642,221 @@ def cache_bomb_word_in_firebase(language: str, word: str) -> None:
         pass
 
 
+def local_pop_card_answer_exists(database: sqlite3.Connection | None, card_id: str, answer: str) -> bool:
+    if database is None:
+        return False
+    row = database.execute(
+        "SELECT 1 FROM pop_card_answers WHERE card_id = ? AND answer = ?",
+        (card_id, answer),
+    ).fetchone()
+    return row is not None
+
+
+def cache_pop_card_answer_in_db(
+    database: sqlite3.Connection | None,
+    card_id: str,
+    answer: str,
+    label: str,
+    source: str = "wikidata",
+) -> None:
+    if database is None:
+        return
+    database.execute(
+        """
+        INSERT INTO pop_card_answers (card_id, answer, label, source, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(card_id, answer) DO UPDATE SET
+            label = excluded.label,
+            source = excluded.source,
+            updated_at = excluded.updated_at
+        """,
+        (card_id, answer, label[:80], source, now_ms()),
+    )
+
+
+def remote_pop_card_answer_exists(card_id: str, answer: str) -> bool:
+    key = (card_id, answer)
+    if key in POP_CARD_REMOTE_CACHE:
+        return POP_CARD_REMOTE_CACHE[key]
+    POP_CARD_REMOTE_CACHE[key] = False
+    if not POP_CARD_REMOTE_FALLBACK:
+        return False
+    url = firebase_database_rest_url(f"popCardAnswers/{card_id}/{answer}")
+    try:
+        with urllib.request.urlopen(url, timeout=3) as response:
+            payload = json.load(response)
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return False
+    accepted = bool(payload)
+    POP_CARD_REMOTE_CACHE[key] = accepted
+    return accepted
+
+
+def cache_pop_card_answer_in_firebase(card_id: str, answer: str, label: str, source: str = "wikidata") -> None:
+    POP_CARD_REMOTE_CACHE[(card_id, answer)] = True
+    if not POP_CARD_REMOTE_FALLBACK:
+        return
+    payload = {
+        "label": label[:80],
+        "source": source,
+        "updatedAt": now_ms(),
+    }
+    url = firebase_database_rest_url(f"popCardAnswers/{card_id}/{answer}")
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3):
+            pass
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        pass
+
+
+def wikidata_search_entities(label: str) -> list[dict]:
+    normalized_label = label.strip()
+    if not POP_CARD_REMOTE_FALLBACK or len(normalize(normalized_label)) < 2:
+        return []
+    results: list[dict] = []
+    seen: set[str] = set()
+    for language in ("pt", "en"):
+        query = urlencode({
+            "action": "wbsearchentities",
+            "format": "json",
+            "language": language,
+            "uselang": language,
+            "type": "item",
+            "limit": "6",
+            "search": normalized_label,
+        })
+        request = urllib.request.Request(
+            f"https://www.wikidata.org/w/api.php?{query}",
+            headers={"User-Agent": "PoliBrasil-EnglishDuel/1.0 (educational word game)"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=4) as response:
+                payload = json.load(response)
+        except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+            continue
+        for item in payload.get("search", []):
+            qid = item.get("id", "")
+            if not qid or qid in seen:
+                continue
+            labels = [item.get("label", ""), item.get("match", {}).get("text", ""), *(item.get("aliases") or [])]
+            if normalize(normalized_label) not in {normalize(value) for value in labels if value}:
+                continue
+            seen.add(qid)
+            results.append(item)
+    return results
+
+
+def wikidata_sparql_ask(query: str) -> bool:
+    request = urllib.request.Request(
+        f"https://query.wikidata.org/sparql?{urlencode({'query': query, 'format': 'json'})}",
+        headers={"User-Agent": "PoliBrasil-EnglishDuel/1.0 (educational word game)"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return False
+    return bool(payload.get("boolean"))
+
+
+def wikidata_entity_matches_pop_card(card_id: str, qid: str) -> bool:
+    if not re.fullmatch(r"Q\d+", qid):
+        return False
+    card_queries = {
+        "famous_singer": """
+ASK {
+  VALUES ?accepted { wd:Q177220 wd:Q488205 wd:Q639669 wd:Q2405480 wd:Q36834 }
+  wd:%s wdt:P21 wd:Q6581072 .
+  wd:%s wdt:P106/wdt:P279* ?accepted .
+}
+""",
+        "famous_movie": """
+ASK {
+  VALUES ?accepted { wd:Q11424 wd:Q202866 wd:Q29168811 wd:Q24856 }
+  wd:%s wdt:P31/wdt:P279* ?accepted .
+}
+""",
+        "famous_series": """
+ASK {
+  VALUES ?accepted { wd:Q5398426 wd:Q1259759 wd:Q15416 wd:Q63952888 wd:Q581714 }
+  wd:%s wdt:P31/wdt:P279* ?accepted .
+}
+""",
+        "tech_company": """
+ASK {
+  VALUES ?acceptedInstance { wd:Q4830453 wd:Q6881511 wd:Q891723 wd:Q167037 }
+  VALUES ?acceptedIndustry { wd:Q7397 wd:Q11661 wd:Q880371 wd:Q21198 wd:Q56598995 }
+  { wd:%s wdt:P31/wdt:P279* ?acceptedInstance . }
+  UNION
+  { wd:%s wdt:P452/wdt:P279* ?acceptedIndustry . }
+}
+""",
+        "programming_language": """
+ASK {
+  VALUES ?accepted { wd:Q9143 wd:Q21562092 wd:Q28922885 }
+  wd:%s wdt:P31/wdt:P279* ?accepted .
+}
+""",
+        "game_franchise": """
+ASK {
+  VALUES ?accepted { wd:Q7889 wd:Q7058673 wd:Q196600 wd:Q108729694 }
+  wd:%s wdt:P31/wdt:P279* ?accepted .
+}
+""",
+    }
+    template = card_queries.get(card_id)
+    if not template:
+        return False
+    return wikidata_sparql_ask(template % ((qid, qid) if card_id in {"famous_singer", "tech_company"} else qid))
+
+
+def wikidata_description_matches_pop_card(card_id: str, entity: dict) -> bool:
+    description = normalize(entity.get("description", ""))
+    keyword_groups = {
+        "famous_singer": ("femalesinger", "cantora", "singerfemale", "mulhercantora"),
+        "famous_movie": ("film", "movie", "filme"),
+        "famous_series": ("series", "serie", "television", "tv", "anime"),
+        "tech_company": ("company", "empresa", "technology", "software", "internet"),
+        "programming_language": ("programminglanguage", "linguagemdeprogramacao"),
+        "game_franchise": ("videogame", "game", "jogo", "franchise", "series"),
+    }
+    return any(keyword in description for keyword in keyword_groups.get(card_id, ()))
+
+
+def wikidata_pop_card_answer_exists(card_id: str, answer: str, label: str) -> bool:
+    for entity in wikidata_search_entities(label):
+        if wikidata_description_matches_pop_card(card_id, entity) or wikidata_entity_matches_pop_card(card_id, entity.get("id", "")):
+            cache_pop_card_answer_in_firebase(card_id, answer, entity.get("label") or label)
+            return True
+    return False
+
+
+def pop_card_answer_exists(
+    card_id: str,
+    answer: str,
+    label: str,
+    database: sqlite3.Connection | None = None,
+) -> bool:
+    card = POP_CARD_INDEX.get(card_id)
+    if card and answer in card["answers"]:
+        return True
+    if local_pop_card_answer_exists(database, card_id, answer):
+        return True
+    if remote_pop_card_answer_exists(card_id, answer):
+        cache_pop_card_answer_in_db(database, card_id, answer, label, "firebase")
+        return True
+    if wikidata_pop_card_answer_exists(card_id, answer, label):
+        cache_pop_card_answer_in_db(database, card_id, answer, label, "wikidata")
+        return True
+    return False
+
+
 def free_dictionary_bomb_word_exists(language: str, word: str) -> bool:
     key = (language, word)
     if key in FREE_WORD_CACHE:
@@ -891,7 +1116,7 @@ def apply_pop_card_answer(database: sqlite3.Connection, bomb: dict, uid: str, an
     if not normalized.startswith(letter):
         set_bomb_feedback(bomb, uid, "wrong_start", normalized, required=letter, card=active_card.get("title", "Carta"))
         return bomb, False
-    if normalized not in card["answers"]:
+    if not pop_card_answer_exists(card["id"], normalized, answer, database):
         set_bomb_feedback(bomb, uid, "invalid", normalized, card=active_card["title"], letter=letter)
         return bomb, False
     bomb["usedWords"][normalized] = True

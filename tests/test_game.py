@@ -18,19 +18,24 @@ class GameEngineTest(unittest.TestCase):
         self.player_two = {"uid": "two", "name": "PLAYER_TWO", "photo": "", "hearts": 3, "score": 0}
         self.remote_bomb_vocabulary = server.REMOTE_BOMB_VOCABULARY
         self.free_word_fallback = server.FREE_WORD_FALLBACK
+        self.pop_card_remote_fallback = server.POP_CARD_REMOTE_FALLBACK
         self.firebase_database_auth = server.FIREBASE_DATABASE_AUTH
         server.REMOTE_BOMB_VOCABULARY = False
         server.REMOTE_BOMB_CACHE.clear()
         server.FREE_WORD_FALLBACK = True
         server.FREE_WORD_CACHE.clear()
+        server.POP_CARD_REMOTE_FALLBACK = False
+        server.POP_CARD_REMOTE_CACHE.clear()
         server.FIREBASE_DATABASE_AUTH = ""
 
     def tearDown(self):
         server.REMOTE_BOMB_VOCABULARY = self.remote_bomb_vocabulary
         server.FREE_WORD_FALLBACK = self.free_word_fallback
+        server.POP_CARD_REMOTE_FALLBACK = self.pop_card_remote_fallback
         server.FIREBASE_DATABASE_AUTH = self.firebase_database_auth
         server.REMOTE_BOMB_CACHE.clear()
         server.FREE_WORD_CACHE.clear()
+        server.POP_CARD_REMOTE_CACHE.clear()
         for suffix in ("", "-shm", "-wal"):
             database_file = Path(f"{server.DATABASE}{suffix}")
             if database_file.exists():
@@ -312,6 +317,35 @@ class GameEngineTest(unittest.TestCase):
         }
         for card_id, normalized in examples.items():
             self.assertIn(normalized, server.POP_CARD_INDEX[card_id]["answers"])
+
+    def test_pop_cards_accepts_wikidata_fallback_answer(self):
+        answer = server.normalize("Nova Cantora")
+        with patch("server.remote_pop_card_answer_exists", return_value=False), \
+                patch("server.wikidata_search_entities", return_value=[{
+                    "id": "Q123", "label": "Nova Cantora", "description": "Brazilian female singer"
+                }]), \
+                patch("server.wikidata_entity_matches_pop_card") as sparql_match, \
+                patch("server.cache_pop_card_answer_in_firebase") as cache_answer:
+            self.assertTrue(server.pop_card_answer_exists("famous_singer", answer, "Nova Cantora"))
+        sparql_match.assert_not_called()
+        cache_answer.assert_called_once_with("famous_singer", answer, "Nova Cantora")
+
+    def test_pop_cards_accepts_cached_firebase_answer(self):
+        answer = server.normalize("Nova Empresa")
+        with patch("server.remote_pop_card_answer_exists", return_value=True), \
+                patch("server.wikidata_pop_card_answer_exists") as wikidata_lookup:
+            self.assertTrue(server.pop_card_answer_exists("tech_company", answer, "Nova Empresa"))
+        wikidata_lookup.assert_not_called()
+
+    def test_pop_cards_accepts_cached_sqlite_answer(self):
+        answer = server.normalize("Nova Franquia")
+        with closing(server.connect_db()) as database, database:
+            server.cache_pop_card_answer_in_db(database, "game_franchise", answer, "Nova Franquia", "wikidata")
+            with patch("server.remote_pop_card_answer_exists") as firebase_lookup, \
+                    patch("server.wikidata_pop_card_answer_exists") as wikidata_lookup:
+                self.assertTrue(server.pop_card_answer_exists("game_franchise", answer, "Nova Franquia", database))
+        firebase_lookup.assert_not_called()
+        wikidata_lookup.assert_not_called()
 
     def test_pop_cards_rejects_answer_with_wrong_letter(self):
         bomb = {

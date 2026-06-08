@@ -37,6 +37,10 @@
       ".read": true,
       ".write": false
     },
+    "popCardAnswers": {
+      ".read": true,
+      ".write": false
+    },
     "liveBombRooms": {
       "$room": {
         "signal": {
