@@ -297,6 +297,22 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["answerLog"][-1]["card"], "Cantora famosa")
         self.assertEqual(bomb["answerLog"][-1]["letter"], "a")
 
+    def test_pop_cards_accepts_brazilian_singer_variations(self):
+        for answer in ("Bruna Carla", "Bruna Karla", "Gaby Amarantos", "Marília Mendonça"):
+            normalized = server.normalize(answer)
+            self.assertIn(normalized, server.POP_CARD_INDEX["famous_singer"]["answers"])
+
+    def test_pop_cards_content_covers_more_pop_categories(self):
+        examples = {
+            "famous_movie": "tropadeelite",
+            "famous_series": "todomundoodeiaochris",
+            "tech_company": "whatsapp",
+            "programming_language": "powershell",
+            "game_franchise": "mortalkombat",
+        }
+        for card_id, normalized in examples.items():
+            self.assertIn(normalized, server.POP_CARD_INDEX[card_id]["answers"])
+
     def test_pop_cards_rejects_answer_with_wrong_letter(self):
         bomb = {
             "code": "POP001", "mode": "pop_cards", "status": "playing", "language": "pt",
