@@ -250,6 +250,59 @@ class GameEngineTest(unittest.TestCase):
         self.assertEqual(bomb["turn"], "two")
         self.assertEqual(bomb["answerLog"][-1]["answer"], "book")
 
+    def test_pop_cards_next_turn_draws_card_and_letter(self):
+        bomb = {
+            "code": "POP001", "mode": "pop_cards", "status": "playing", "language": "pt",
+            "round": 0, "turn": None,
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": [],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb = server.next_bomb_turn(bomb, database)
+        self.assertEqual(bomb["round"], 1)
+        self.assertIn(bomb["turn"], {"one", "two"})
+        self.assertIn("title", bomb["challenge"])
+        self.assertEqual(len(bomb["challenge"]["letter"]), 1)
+
+    def test_pop_cards_accepts_valid_answer_for_card_and_letter(self):
+        bomb = {
+            "code": "POP001", "mode": "pop_cards", "status": "playing", "language": "pt",
+            "round": 1, "turn": "one", "challenge": {"cardId": "famous_singer", "title": "Cantora famosa", "category": "cultura_pop", "letter": "a"},
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["famous_singer:a"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "Adele")
+        self.assertTrue(accepted)
+        self.assertEqual(bomb["players"]["one"]["score"], 120)
+        self.assertEqual(bomb["answerLog"][-1]["card"], "Cantora famosa")
+        self.assertEqual(bomb["answerLog"][-1]["letter"], "a")
+
+    def test_pop_cards_rejects_answer_with_wrong_letter(self):
+        bomb = {
+            "code": "POP001", "mode": "pop_cards", "status": "playing", "language": "pt",
+            "round": 1, "turn": "one", "challenge": {"cardId": "famous_singer", "title": "Cantora famosa", "category": "cultura_pop", "letter": "b"},
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["famous_singer:b"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "Adele")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["turn"], "one")
+        self.assertEqual(bomb["lastFeedback"]["kind"], "wrong_start")
+
+    def test_pop_cards_rejects_answer_outside_card(self):
+        bomb = {
+            "code": "POP001", "mode": "pop_cards", "status": "playing", "language": "pt",
+            "round": 1, "turn": "one", "challenge": {"cardId": "tech_company", "title": "Empresa de tecnologia", "category": "tecnologia", "letter": "a"},
+            "players": {"one": self.player_one.copy(), "two": self.player_two.copy()}, "order": ["one", "two"],
+            "usedWords": {}, "usedPrompts": ["tech_company:a"],
+        }
+        with closing(server.connect_db()) as database, database:
+            bomb, accepted = server.apply_bomb_answer(database, bomb, "one", "Adele")
+        self.assertFalse(accepted)
+        self.assertEqual(bomb["lastFeedback"]["kind"], "invalid")
+
     def test_word_chain_first_answer_sets_next_required_syllable(self):
         bomb = {
             "code": "CHAIN1", "mode": "word_chain", "status": "playing", "language": "en",

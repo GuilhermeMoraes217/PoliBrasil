@@ -86,6 +86,7 @@ h1 span { color: var(--green); }
 .mode-card.amber::before { background: #f4c95d; }.amber .pixel-icon, .amber .text-button { color: #f4c95d; }
 .mode-card.cyan::before { background: #67e8f9; }.cyan .pixel-icon, .cyan .text-button { color: #67e8f9; }
 .mode-card.rose::before { background: #ff9fcb; }.rose .pixel-icon, .rose .text-button { color: #ff9fcb; }
+.mode-card.blue::before { background: #60a5fa; }.blue .pixel-icon, .blue .text-button { color: #60a5fa; }
 .mode-top { color: var(--muted); display: flex; font-size: 10px; justify-content: space-between; letter-spacing: 2px; }
 .mode-top i { border: 1px solid var(--line); font-style: normal; padding: 4px 6px; }
 .pixel-icon { color: var(--green); font-family: "Press Start 2P"; font-size: 32px; margin: 42px 0 23px; }

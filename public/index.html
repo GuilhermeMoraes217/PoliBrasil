@@ -62,7 +62,7 @@
 
         <div class="section-heading">
           <div><p class="eyebrow">// SELECT_GAME_MODE</p><h2>ESCOLHA SEU DESAFIO</h2></div>
-          <span>5 MODOS DISPONÍVEIS</span>
+          <span>6 MODOS DISPONÍVEIS</span>
         </div>
         <div class="mode-grid">
           <article class="mode-card green">
@@ -99,6 +99,13 @@
             <h3>WORD<br>CHAIN</h3>
             <p>Use a última sílaba da palavra anterior em qualquer parte da próxima resposta.</p>
             <button id="open-chain" class="text-button">JOGAR ESTE MODO <b>→</b></button>
+          </article>
+          <article class="mode-card blue">
+            <div class="mode-top"><span>MODE_06</span><i>A-Z</i></div>
+            <div class="pixel-icon">POP<span>?</span></div>
+            <h3>POP<br>CARDS</h3>
+            <p>Sorteie uma carta de cultura pop, entretenimento ou tecnologia e responda algo com a letra da rodada.</p>
+            <button id="open-pop-cards" class="text-button">JOGAR ESTE MODO <b>→</b></button>
           </article>
         </div>
         <div class="dashboard-grid">
@@ -322,7 +329,7 @@
       <button class="close-modal" aria-label="Fechar">×</button>
       <p id="bomb-modal-eyebrow" class="eyebrow">// START_WORD_BOMB</p>
       <h2 id="bomb-modal-title">WORD BOMB</h2>
-      <label>IDIOMA DAS PALAVRAS</label>
+      <label id="bomb-language-label">IDIOMA DAS PALAVRAS</label>
       <select id="bomb-language" class="category-choice">
         <option value="en">INGLÊS</option>
         <option value="pt">PORTUGUÊS</option>

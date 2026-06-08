@@ -131,6 +131,15 @@ class WsgiAppTest(unittest.TestCase):
         self.assertIn(started.json["bomb"]["turn"], {"demo-one", "demo-two"})
         self.assertIn("serverNow", started.json["bomb"])
 
+    def test_pop_cards_room_can_be_created(self):
+        with patch.object(server, "ALLOW_DEMO", True):
+            created = self.client.post(
+                "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "pt", "mode": "pop_cards"}
+            )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json["bomb"]["mode"], "pop_cards")
+        self.assertIsNone(created.json["bomb"]["challenge"])
+
     def test_word_bomb_rematch_returns_everyone_to_lobby(self):
         bomb = {
             "code": "BOMB02", "owner": "demo-one", "language": "pt", "difficulty": "easy", "status": "finished",

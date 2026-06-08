@@ -98,6 +98,7 @@ function bindInterface() {
   $("#context-form").addEventListener("submit", submitContextWord);
   $("#open-bomb").addEventListener("click", openBombModal);
   $("#open-chain").addEventListener("click", openChainModal);
+  $("#open-pop-cards").addEventListener("click", openPopCardsModal);
   $("#create-bomb").addEventListener("click", createBomb);
   $("#join-bomb").addEventListener("click", joinBomb);
   $("#bomb-ready").addEventListener("click", toggleBombReady);
@@ -471,12 +472,25 @@ async function openChainModal() {
   await loadOpenBombs();
 }
 
+async function openPopCardsModal() {
+  if (!requireGoogleLogin()) return;
+  configureBombModal("pop_cards");
+  $("#bomb-modal").showModal();
+  await loadOpenBombs();
+}
+
 function configureBombModal(mode) {
   state.selectedBombMode = mode;
   const chain = mode === "word_chain";
-  $("#bomb-modal-eyebrow").textContent = chain ? "// START_WORD_CHAIN" : "// START_WORD_BOMB";
-  $("#bomb-modal-title").textContent = chain ? "WORD CHAIN" : "WORD BOMB";
-  $("#bomb-modal-note").textContent = chain
+  const popCards = mode === "pop_cards";
+  $("#bomb-modal-eyebrow").textContent = popCards ? "// START_POP_CARDS" : chain ? "// START_WORD_CHAIN" : "// START_WORD_BOMB";
+  $("#bomb-modal-title").textContent = popCards ? "POP CARDS" : chain ? "WORD CHAIN" : "WORD BOMB";
+  $("#bomb-language-label").classList.toggle("hidden", popCards);
+  $("#bomb-language").classList.toggle("hidden", popCards);
+  $("#bomb-language").value = popCards ? "pt" : $("#bomb-language").value;
+  $("#bomb-modal-note").textContent = popCards
+    ? "Sorteie cartas de cultura pop, entretenimento e tecnologia. Responda um item valido com a letra exibida."
+    : chain
     ? "A primeira palavra e livre. Depois, cada resposta precisa conter a ultima silaba da palavra anterior."
     : "A partida comeca em EASY 1 e aumenta o nivel automaticamente a cada 5-7 rodadas.";
 }
@@ -575,6 +589,7 @@ function renderBomb() {
   const bomb = state.bomb;
   if (!bomb) return;
   const chain = isWordChain(bomb);
+  const popCards = isPopCards(bomb);
   const players = bomb.order.map((uid) => bomb.players[uid]).filter(Boolean);
   const activePlayer = bomb.players[bomb.turn];
   const me = bomb.players[state.user.uid];
@@ -587,10 +602,10 @@ function renderBomb() {
     $("#bomb-finish-panel").classList.add("hidden");
     state.lastBombFinish = null;
   }
-  $("#bomb-screen-title").textContent = `${chain ? "WORD_CHAIN" : "WORD_BOMB"} · MULTIPLAYER`;
-  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
+  $("#bomb-screen-title").textContent = `${bombGameLabel(bomb)} · MULTIPLAYER`;
+  $("#bomb-meta").textContent = `ROOM #${bomb.code} · ${popCards ? "POP/TECH" : bomb.language === "pt" ? "PORTUGUÊS" : "ENGLISH"} · ${bombLevelLabel(bomb)} · ${bombLevelProgressLabel(bomb)}`;
   $("#bomb-invite-link").textContent = bombInviteUrl();
-  $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar ${chain ? "Word Chain" : "Word Bomb"} no Poli English Duel? ${bombInviteUrl()}`)}`;
+  $("#bomb-whatsapp-invite").href = `https://wa.me/?text=${encodeURIComponent(`Bora jogar ${bombGameTitle(bomb)} no Poli English Duel? ${bombInviteUrl()}`)}`;
   const playerCard = (player, index) => `
     <div class="bomb-player ${player.uid === bomb.turn ? "active" : ""} ${player.hearts <= 0 ? "out" : ""}">
       <span class="bomb-position">${String(index + 1).padStart(2, "0")}</span>
@@ -629,14 +644,17 @@ function renderBomb() {
   $("#bomb-turn-arrow").classList.toggle("hidden", bomb.status !== "playing");
   $("#bomb-phase").textContent = waiting ? "// WAITING_FOR_PLAYERS" : bomb.status === "finished" ? "// GAME_OVER" : `// TURNO_DE_${activePlayer?.name || "PLAYER"}`;
   const requiredChain = bomb.requiredSyllable || bomb.requiredStart;
-  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : chain ? (requiredChain ? requiredChain.toUpperCase() : "ANY") : bomb.prompt;
+  const cardChallenge = bomb.challenge || {};
+  $("#bomb-prefix").textContent = waiting ? "READY?" : bomb.status === "finished" ? "GG" : popCards ? String(cardChallenge.letter || "?").toUpperCase() : chain ? (requiredChain ? requiredChain.toUpperCase() : "ANY") : bomb.prompt;
   $("#bomb-live-label").textContent = waiting
-    ? (chain ? "Todos marcam pronto. A primeira palavra sera livre." : "Todos marcam pronto. O host inicia a partida.")
-    : chain
+    ? (popCards ? "Todos marcam pronto. O host sorteia cartas de cultura pop e tecnologia." : chain ? "Todos marcam pronto. A primeira palavra sera livre." : "Todos marcam pronto. O host inicia a partida.")
+    : popCards
+      ? `Carta: ${cardChallenge.title || "Tema surpresa"} · ${activePlayer?.name || "PLAYER"} responde com ${String(cardChallenge.letter || "?").toUpperCase()}:`
+      : chain
       ? `${activePlayer?.name || "PLAYER"} precisa usar ${requiredChain ? requiredChain.toUpperCase() : "qualquer silaba"}${bomb.lastWord ? ` depois de ${bomb.lastWord}` : ""}:`
       : `${activePlayer?.name || "PLAYER"} digita uma palavra ao vivo:`;
   $("#bomb-input").disabled = !canAnswer;
-  $("#bomb-input").placeholder = canAnswer ? (chain ? "digite_uma_palavra_da_corrente..." : "digite_a_palavra_completa...") : "aguarde_seu_turno...";
+  $("#bomb-input").placeholder = canAnswer ? (popCards ? "ex: adele, avatar, apple..." : chain ? "digite_uma_palavra_da_corrente..." : "digite_a_palavra_completa...") : "aguarde_seu_turno...";
   const liveTyping = state.bombTypingByUid[bomb.turn] || {};
   $("#bomb-live-typing").textContent = bomb.status === "playing" && liveTyping.round === bomb.round ? liveTyping.value || "" : "";
   $("#bomb-ready").classList.toggle("hidden", !waiting);
@@ -661,11 +679,14 @@ function renderBomb() {
 function renderBombFeedback(feedback) {
   const element = $("#bomb-feedback");
   const chain = isWordChain(state.bomb);
+  const popCards = isPopCards(state.bomb);
   const actor = state.bomb.players[feedback.uid]?.name || "PLAYER";
   const isNewFeedback = feedback.id !== state.lastBombFeedback;
   if (isNewFeedback) state.lastBombFeedback = feedback.id;
   if (feedback.kind === "correct") {
-    element.textContent = chain
+    element.textContent = popCards
+      ? `${actor} acertou ${feedback.answer} em ${feedback.card || "carta"} (${String(feedback.letter || "").toUpperCase()}). +${feedback.xp} XP`
+      : chain
       ? `${actor} conectou ${feedback.answer}. Proxima silaba: ${(feedback.nextSyllable || feedback.nextStart || "").toUpperCase()}. +${feedback.xp} XP`
       : `${actor} respondeu ${feedback.answer}. +${feedback.xp} XP`;
     element.className = "feedback correct";
@@ -679,7 +700,9 @@ function renderBombFeedback(feedback) {
     element.className = "feedback wrong";
     if (isNewFeedback) playSound("wrong");
   } else if (feedback.kind === "missing_syllable" || feedback.kind === "wrong_start") {
-    element.textContent = `${actor} escreveu ${feedback.answer}, mas precisava conter ${(feedback.required || "").toUpperCase()}.`;
+    element.textContent = popCards
+      ? `${actor} escreveu ${feedback.answer}, mas a resposta precisava comecar com ${(feedback.required || "").toUpperCase()}.`
+      : `${actor} escreveu ${feedback.answer}, mas precisava conter ${(feedback.required || "").toUpperCase()}.`;
     element.className = "feedback wrong";
     if (isNewFeedback) playSound("wrong");
   } else {
@@ -696,7 +719,9 @@ function renderBombAnswerLog() {
   list.innerHTML = log.length ? log.map((entry) => {
     const player = state.bomb.players[entry.uid];
     const label = bombLogLabel(entry);
-    const detail = entry.kind === "missing_syllable"
+    const detail = entry.card
+      ? `${String(entry.letter || "").toUpperCase()} · ${entry.card}`
+      : entry.kind === "missing_syllable"
       ? `REQ ${String(entry.required || "").toUpperCase()}`
       : entry.kind === "correct" && entry.nextSyllable
         ? `NEXT ${String(entry.nextSyllable).toUpperCase()}`
@@ -716,6 +741,7 @@ function bombLogLabel(entry) {
   if (entry.kind === "correct") return "OK";
   if (entry.kind === "duplicate") return "REP";
   if (entry.kind === "missing_syllable") return "REQ";
+  if (entry.kind === "wrong_start") return "LET";
   return "ERR";
 }
 
@@ -737,11 +763,16 @@ function playerPosition(index, total, compact = false) {
 }
 
 function bombLevelLabel(bomb) {
+  if (isPopCards(bomb)) return "POP_CARDS";
   if (isWordChain(bomb)) return "CHAIN";
   return `${(bomb.difficulty || "easy").toUpperCase()} ${bomb.sublevel || 1}`;
 }
 
 function bombLevelProgressLabel(bomb) {
+  if (isPopCards(bomb)) {
+    const challenge = bomb.challenge || {};
+    return challenge.title ? `${String(challenge.letter || "?").toUpperCase()}_${String(challenge.category || "POP").toUpperCase()}` : "A_Z_CARDS";
+  }
   if (isWordChain(bomb)) {
     const required = bomb.requiredSyllable || bomb.requiredStart;
     return required ? `USE_${required.toUpperCase()}` : "FIRST_WORD_FREE";
@@ -755,8 +786,18 @@ function isWordChain(bomb) {
   return bomb?.mode === "word_chain";
 }
 
+function isPopCards(bomb) {
+  return bomb?.mode === "pop_cards";
+}
+
 function bombGameLabel(bomb) {
+  if (isPopCards(bomb)) return "POP_CARDS";
   return isWordChain(bomb) ? "WORD_CHAIN" : "WORD_BOMB";
+}
+
+function bombGameTitle(bomb) {
+  if (isPopCards(bomb)) return "Pop Cards";
+  return isWordChain(bomb) ? "Word Chain" : "Word Bomb";
 }
 
 function startBombTimer() {
@@ -899,11 +940,10 @@ async function clearBombTyping() {
 function renderBombFinished() {
   const winner = state.bomb.players[state.bomb.winner];
   const finishKey = `${state.bomb.code}:${state.bomb.winner || "draw"}:${state.bomb.finishReason || "finished"}`;
-  const chain = isWordChain(state.bomb);
   $("#bomb-prefix").textContent = "GG";
   $("#bomb-live-typing").textContent = "";
   $("#bomb-input").value = "";
-  $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o ${chain ? "WORD CHAIN" : "WORD BOMB"}!` : "Partida encerrada.";
+  $("#bomb-feedback").textContent = winner ? `${winner.name} venceu o ${bombGameLabel(state.bomb)}!` : "Partida encerrada.";
   $("#bomb-feedback").className = "feedback correct";
   $("#bomb-finish-panel").classList.remove("hidden");
   $("#bomb-finish-title").textContent = winner ? `${winner.name} venceu!` : "Partida encerrada";
@@ -1319,12 +1359,13 @@ function openInvite() {
   const code = new URLSearchParams(location.search).get("room");
   const bombCode = new URLSearchParams(location.search).get("bomb");
   const chainCode = new URLSearchParams(location.search).get("chain");
+  const popCode = new URLSearchParams(location.search).get("pop");
   if (code) {
     $("#join-code").value = code.toUpperCase();
     $("#join-modal").showModal();
   }
-  if (bombCode || chainCode) {
-    state.pendingBombJoinCode = (bombCode || chainCode).toUpperCase();
+  if (bombCode || chainCode || popCode) {
+    state.pendingBombJoinCode = (bombCode || chainCode || popCode).toUpperCase();
     if (isGoogleUser()) completePendingBombJoin();
     else toast("Faça login com Google para entrar diretamente no lobby");
   }
@@ -1359,7 +1400,8 @@ async function copyInvite() {
 }
 
 function bombInviteUrl() {
-  return `${location.origin}${location.pathname}?${isWordChain(state.bomb) ? "chain" : "bomb"}=${state.bomb?.code || "------"}`;
+  const param = isPopCards(state.bomb) ? "pop" : isWordChain(state.bomb) ? "chain" : "bomb";
+  return `${location.origin}${location.pathname}?${param}=${state.bomb?.code || "------"}`;
 }
 
 async function copyBombInvite() {
