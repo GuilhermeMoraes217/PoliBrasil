@@ -1052,6 +1052,23 @@ def redraw_pop_card(bomb: dict) -> dict:
     return bomb
 
 
+def can_redraw_pop_card(bomb: dict, uid: str) -> bool:
+    if bomb.get("mode") != "pop_cards" or bomb.get("owner") != uid:
+        return False
+    if bomb.get("status") == "waiting":
+        return True
+    if bomb.get("status") != "playing":
+        return False
+    logged_play = any(entry.get("kind") != "card_drawn" for entry in bomb.get("answerLog", []))
+    return (
+        bomb.get("phase") == "letter_select"
+        and not bomb.get("selectedLetter")
+        and not bomb.get("usedWords")
+        and not bomb.get("usedLetters")
+        and not logged_play
+    )
+
+
 def available_pop_letters(bomb: dict) -> list[str]:
     card = POP_CARD_INDEX.get((bomb.get("activeCard") or {}).get("id", ""))
     if not card:
@@ -1397,13 +1414,16 @@ class PoliHandler(SimpleHTTPRequestHandler):
             bomb = read_bomb(database, code)
             if not bomb or user["uid"] not in bomb.get("players", {}):
                 return self.send_json({"error": "Sala Word Bomb nao encontrada"}, status=404)
-            if bomb["owner"] != user["uid"]:
-                return self.send_json({"error": "Somente o host pode sortear outra carta"}, status=403)
             if bomb.get("mode") != "pop_cards":
                 return self.send_json({"error": "Esta acao existe apenas no Pop Cards"}, status=400)
-            if bomb["status"] != "waiting" or bomb.get("round", 0) > 0:
-                return self.send_json({"error": "A carta so pode ser trocada antes da partida comecar"}, status=409)
+            if bomb["owner"] != user["uid"]:
+                return self.send_json({"error": "Somente o host pode sortear outra carta"}, status=403)
+            if not can_redraw_pop_card(bomb, user["uid"]):
+                return self.send_json({"error": "A carta so pode ser trocada antes da primeira jogada"}, status=409)
             bomb = redraw_pop_card(bomb)
+            if bomb.get("status") == "playing":
+                bomb["phase"] = "letter_select"
+                bomb["deadline"] = bomb_deadline(bomb)
             write_bomb(database, bomb)
         return self.send_json({"bomb": public_bomb(bomb)})
 

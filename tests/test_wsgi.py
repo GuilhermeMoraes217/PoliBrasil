@@ -142,26 +142,31 @@ class WsgiAppTest(unittest.TestCase):
         self.assertIsNone(created.json["bomb"]["activeCard"])
         self.assertEqual(created.json["bomb"]["phase"], "waiting_card")
 
-    def test_pop_cards_host_can_redraw_card_before_start_only(self):
+    def test_pop_cards_host_can_redraw_card_before_first_play_only(self):
         with patch.object(server, "ALLOW_DEMO", True):
             created = self.client.post(
                 "/api/bombs", headers={"Authorization": "Bearer demo-one"}, json={"language": "pt", "mode": "pop_cards"}
             )
             code = created.json["bomb"]["code"]
-            redrawn = self.client.post(
-                f"/api/bombs/{code}/redraw", headers={"Authorization": "Bearer demo-one"}, json={}
-            )
             self.client.post(f"/api/bombs/{code}/join", headers={"Authorization": "Bearer demo-two"}, json={})
             self.client.post(f"/api/bombs/{code}/ready", headers={"Authorization": "Bearer demo-one"}, json={"ready": True})
             self.client.post(f"/api/bombs/{code}/ready", headers={"Authorization": "Bearer demo-two"}, json={"ready": True})
             started = self.client.post(f"/api/bombs/{code}/start", headers={"Authorization": "Bearer demo-one"}, json={})
+            redrawn = self.client.post(
+                f"/api/bombs/{code}/redraw", headers={"Authorization": "Bearer demo-one"}, json={}
+            )
+            letter = redrawn.json["bomb"]["availableLetters"][0]
+            self.client.post(
+                f"/api/bombs/{code}/answer", headers={"Authorization": "Bearer demo-one"},
+                json={"answer": letter, "round": redrawn.json["bomb"]["round"]},
+            )
             blocked = self.client.post(
                 f"/api/bombs/{code}/redraw", headers={"Authorization": "Bearer demo-one"}, json={}
             )
+        self.assertEqual(started.status_code, 200)
         self.assertEqual(redrawn.status_code, 200)
         self.assertIsNotNone(redrawn.json["bomb"]["activeCard"])
-        self.assertEqual(redrawn.json["bomb"]["phase"], "waiting_card")
-        self.assertEqual(started.status_code, 200)
+        self.assertEqual(redrawn.json["bomb"]["phase"], "letter_select")
         self.assertEqual(blocked.status_code, 409)
 
     def test_word_bomb_rematch_returns_everyone_to_lobby(self):

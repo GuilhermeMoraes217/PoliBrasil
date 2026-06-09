@@ -686,7 +686,7 @@ function renderBomb() {
   $("#bomb-invite").classList.toggle("hidden", !waiting);
   $("#bomb-ready").textContent = me?.ready ? "CANCELAR PRONTO" : "ESTOU PRONTO";
   const allReady = players.length >= 2 && players.every((player) => player.ready);
-  const canRedrawCard = waiting && popCards && bomb.owner === state.user.uid && !bomb.round;
+  const canRedrawCard = canRedrawPopCard(bomb);
   $("#bomb-redraw-card").classList.toggle("hidden", !canRedrawCard);
   $("#bomb-redraw-card").disabled = !canRedrawCard;
   $("#bomb-start").classList.toggle("hidden", !waiting || bomb.owner !== state.user.uid);
@@ -895,6 +895,19 @@ function isWordChain(bomb) {
 
 function isPopCards(bomb) {
   return bomb?.mode === "pop_cards";
+}
+
+function canRedrawPopCard(bomb) {
+  if (!isPopCards(bomb) || bomb.owner !== state.user.uid || !bomb.activeCard) return false;
+  const hasWords = Object.keys(bomb.usedWords || {}).length > 0;
+  const hasUsedLetters = Object.keys(bomb.usedLetters || {}).length > 0;
+  const hasLoggedPlay = (bomb.answerLog || []).some((entry) => entry.kind !== "card_drawn");
+  return bomb.status === "playing"
+    && bomb.phase === "letter_select"
+    && !bomb.selectedLetter
+    && !hasWords
+    && !hasUsedLetters
+    && !hasLoggedPlay;
 }
 
 function bombGameLabel(bomb) {
